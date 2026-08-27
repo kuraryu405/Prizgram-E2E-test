@@ -43,8 +43,8 @@ async function convertVideos() {
   const webmFiles = (await walk(resultsDir)).filter((path) => path.endsWith(".webm"));
 
   for (const webm of webmFiles) {
-    const tempMp4 = `${webm}.mp4.tmp`;
     const finalMp4 = webm.replace(/\.webm$/, ".mp4");
+    const tempMp4 = `${finalMp4}.tmp.mp4`;
     const code = await run("ffmpeg", [
       "-y",
       "-i",
@@ -62,6 +62,7 @@ async function convertVideos() {
       tempMp4,
     ]);
     if (code !== 0) {
+      await rm(tempMp4, { force: true });
       throw new Error(`ffmpeg failed for ${webm}`);
     }
     await rename(tempMp4, finalMp4);
