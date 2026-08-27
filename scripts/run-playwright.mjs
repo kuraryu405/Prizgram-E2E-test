@@ -66,7 +66,6 @@ async function convertVideos() {
       throw new Error(`ffmpeg failed for ${webm}`);
     }
     await rename(tempMp4, finalMp4);
-    await rm(webm);
     process.stdout.write(`MP4 evidence: ${finalMp4}\n`);
   }
 }
