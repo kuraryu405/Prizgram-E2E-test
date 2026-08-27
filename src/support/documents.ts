@@ -20,6 +20,12 @@ function documentCard(page: Page, title: string): Locator {
     .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
 }
 
+function editingDocumentCard(page: Page): Locator {
+  return page
+    .locator("ul.document-list > li.card")
+    .filter({ has: page.getByLabel("書類タイトル") });
+}
+
 export async function createManualDocument(page: Page): Promise<void> {
   assertMutationAllowed();
   await expect(page.getByRole("heading", { name: "応募書類 / ES" })).toBeVisible();
@@ -37,15 +43,21 @@ export async function createManualDocument(page: Page): Promise<void> {
 
 export async function renameManualDocument(page: Page): Promise<void> {
   assertMutationAllowed();
-  const card = documentCard(page, manualDocumentTitle);
-  await card.getByRole("button", { name: "タイトルを編集" }).click();
-  await card.getByLabel("書類タイトル").fill(editedDocumentTitle);
+  const displayCard = documentCard(page, manualDocumentTitle);
+  await displayCard.getByRole("button", { name: "タイトルを編集" }).click();
+
+  // Entering edit mode replaces the document title heading with a label/input,
+  // so a locator filtered by the old heading no longer matches. Re-scope to
+  // the single card that now owns the title editor.
+  const editCard = editingDocumentCard(page);
+  await expect(editCard).toHaveCount(1);
+  await editCard.getByLabel("書類タイトル").fill(editedDocumentTitle);
   await runAndRequireResponse(
     page,
     apiResponseMatcher("PATCH", /^\/api\/documents\/[^/]+$/),
     "Document rename",
     async () => {
-      await card.getByRole("button", { name: "保存", exact: true }).click();
+      await editCard.getByRole("button", { name: "保存", exact: true }).click();
     },
   );
   await expect(page.getByRole("heading", { name: editedDocumentTitle })).toBeVisible();
