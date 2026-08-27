@@ -72,12 +72,13 @@ async function updateApplication(
     expectedStatusText: string;
   }>,
 ): Promise<void> {
-  await page.getByLabel("ステータス変更（任意）").selectOption(input.status);
-  await page.getByLabel("現在の段階（任意）").fill(input.stage);
-  await page.getByLabel("次のアクション").fill(input.nextAction);
-  await page.getByLabel("メモ").fill(input.note);
-  await page.getByRole("button", { name: "更新する" }).click();
-  await expect(page.getByRole("status")).toContainText("更新しました。");
+  const form = page.getByRole("heading", { name: "更新", exact: true }).locator("..");
+  await form.getByLabel("ステータス変更（任意）", { exact: true }).selectOption(input.status);
+  await form.getByLabel("現在の段階（任意）", { exact: true }).fill(input.stage);
+  await form.getByLabel("次のアクション", { exact: true }).fill(input.nextAction);
+  await form.getByLabel("メモ", { exact: true }).fill(input.note);
+  await form.getByRole("button", { name: "更新する", exact: true }).click();
+  await expect(form.getByRole("status")).toContainText("更新しました。");
   const overview = page.getByRole("heading", { name: "現在の状況" }).locator("..");
   await expect(overview).toContainText(input.expectedStatusText);
   await expect(overview).toContainText(input.stage);
