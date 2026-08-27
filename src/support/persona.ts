@@ -14,13 +14,12 @@ const personaSteps = [
 
 export async function createPersonaFromFixture(page: Page): Promise<void> {
   assertMutationAllowed();
-  await page.goto("/app/persona");
 
-  const start = page.getByRole("link", { name: "ヒアリングをはじめる" });
-  if (await start.isVisible().catch(() => false)) {
-    await start.click();
-  }
-
+  // `/app/persona/intake` is the canonical route for a user without a Persona.
+  // Enter it directly rather than relying on the Persona empty-state CTA being
+  // detected and clicked; that keeps the E2E focused on the intake contract.
+  await page.goto("/app/persona/intake");
+  await expect(page).toHaveURL(/\/app\/persona\/intake(?:$|[/?#])/);
   await expect(
     page.getByRole("heading", { name: "ペルソナ・ヒアリング" }),
   ).toBeVisible();
