@@ -25,20 +25,39 @@ export async function generateInterviewQuestions(page: Page): Promise<void> {
   await expect(card.getByRole("heading", { name: "想定質問" })).toBeVisible({
     timeout: AI_RESULT_TIMEOUT,
   });
-  await expect(card.getByRole("button", { name: "回答を組み立てる" }).first()).toBeVisible();
+
+  const firstQuestionButton = card
+    .getByRole("button", { name: "回答を組み立てる" })
+    .first();
+  await expect(firstQuestionButton).toBeVisible();
+  const questionCard = firstQuestionButton.locator("..");
+  await expect(questionCard.locator("strong")).not.toHaveText("");
+  await expect(questionCard).toContainText(/意図:\s*\S+/);
+  await expect(questionCard).toContainText(/根拠:\s*\S+/);
+  await expect(questionCard).toContainText(/使えそうな材料:\s*\S+/);
 }
 
 export async function generateInterviewOutlineAndFollowup(page: Page): Promise<void> {
   assertMutationAllowed();
   const card = interviewCard(page);
   await card.getByRole("button", { name: "回答を組み立てる" }).first().click();
-  await expect(card.getByRole("heading", { name: "回答骨子" })).toBeVisible({
+  const outlineHeading = card.getByRole("heading", { name: "回答骨子" });
+  await expect(outlineHeading).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+  const outlineArea = outlineHeading.locator("..");
+  const outlineBox = outlineArea.locator(".card").first();
+  await expect(outlineBox).toBeVisible();
+  await expect(outlineBox.getByRole("listitem").first()).toBeVisible();
+  await expect(outlineBox).toContainText(/根拠:\s*\S+/);
+
+  await outlineBox.getByRole("button", { name: "深掘りを見る" }).click();
+  await expect(outlineBox.getByText("深掘り候補", { exact: true })).toBeVisible({
     timeout: AI_RESULT_TIMEOUT,
   });
-  await card.getByRole("button", { name: "深掘りを見る" }).click();
-  await expect(card.getByText("深掘り候補", { exact: true })).toBeVisible({
-    timeout: AI_RESULT_TIMEOUT,
-  });
+  const followupList = outlineBox
+    .getByText("深掘り候補", { exact: true })
+    .locator("..")
+    .getByRole("list");
+  await expect(followupList.getByRole("listitem").first()).toBeVisible();
 }
 
 export async function saveInterviewReflection(page: Page): Promise<void> {
