@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "../../src/support/test.js";
 import { applyToCurrentJob } from "../../src/support/applications.js";
 import { newTestAccount, register } from "../../src/support/account.js";
 import {
