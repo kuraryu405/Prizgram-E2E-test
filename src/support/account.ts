@@ -58,6 +58,8 @@ export async function loginSuccessfully(
 }
 
 export async function logout(page: Page): Promise<void> {
+  const accountTrigger = page.getByLabel(/^アカウント /);
+  await accountTrigger.click();
   await page.getByRole("button", { name: "ログアウト" }).click();
   await expect(page).toHaveURL(/\/$/);
 }
