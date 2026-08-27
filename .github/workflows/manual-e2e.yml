@@ -16,6 +16,7 @@ on:
           - critical
           - integration
           - mobile
+          - golden
           - all
 
 permissions:
@@ -79,6 +80,7 @@ jobs:
             critical) pnpm test:critical ;;
             integration) pnpm test:integration ;;
             mobile) pnpm test:mobile ;;
+            golden) pnpm test:golden ;;
             all) pnpm test:e2e ;;
             *) echo "Unknown suite" >&2; exit 2 ;;
           esac
