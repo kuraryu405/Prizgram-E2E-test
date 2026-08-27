@@ -8,7 +8,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  timeout: 120_000,
+  // AI/LLM operations may take an arbitrarily long time. Ordinary browser
+  // actions, navigation, and non-AI assertions still have finite timeouts below.
+  timeout: 0,
   expect: {
     timeout: 15_000,
   },
