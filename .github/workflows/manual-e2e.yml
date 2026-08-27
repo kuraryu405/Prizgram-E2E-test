@@ -1,0 +1,107 @@
+name: Manual Mutable E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Disposable / staging / preview Prizgram URL
+        required: true
+        type: string
+      suite:
+        description: Suite to run
+        required: true
+        default: critical
+        type: choice
+        options:
+          - critical
+          - integration
+          - mobile
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutable-e2e-${{ inputs.base_url }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      E2E_BASE_URL: ${{ inputs.base_url }}
+      E2E_ALLOW_MUTATION: 'true'
+      E2E_ALLOW_PRODUCTION: 'false'
+      E2E_PRODUCTION_HOSTS: prizgram.kuraryu.jp
+    steps:
+      - name: Refuse production targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          host="$(node -e "console.log(new URL(process.argv[1]).hostname)" "${E2E_BASE_URL}")"
+          if [[ "$host" == "prizgram.kuraryu.jp" ]]; then
+            echo "Mutable E2E is forbidden against production: $host" >&2
+            exit 1
+          fi
+          echo "Mutable E2E target: $host"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run selected suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ inputs.suite }}" in
+            critical) pnpm test:critical ;;
+            integration) pnpm test:integration ;;
+            mobile) pnpm test:mobile ;;
+            all) pnpm test:e2e ;;
+            *) echo "Unknown suite" >&2; exit 2 ;;
+          esac
+
+      - name: Upload MP4 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-mp4-${{ inputs.suite }}-${{ github.run_id }}
+          path: |
+            artifacts/test-results/**/*.mp4
+            artifacts/test-results/**/evidence/*.png
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Playwright debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-debug-${{ inputs.suite }}-${{ github.run_id }}
+          path: |
+            artifacts/test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
