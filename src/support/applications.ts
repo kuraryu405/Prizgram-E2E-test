@@ -25,36 +25,62 @@ export async function verifyPinnedSnapshotAndDuplicateGuard(page: Page): Promise
   await expect(page).toHaveURL(applicationUrl);
 }
 
-export async function updateApplicationToInterview(page: Page): Promise<void> {
-  assertMutationAllowed();
-  await page.getByLabel("ステータス変更（任意）").selectOption("interview");
-  await page.getByLabel("現在の段階（任意）").fill("一次面接");
-  await page.getByLabel("次のアクション").fill("想定質問を確認して面接準備を行う");
-  await page.getByLabel("メモ").fill("E2E synthetic application: 面接フェーズへ更新");
+async function updateApplication(
+  page: Page,
+  input: Readonly<{
+    status: string;
+    stage: string;
+    nextAction: string;
+    note: string;
+    expectedStatusText: string;
+  }>,
+): Promise<void> {
+  await page.getByLabel("ステータス変更（任意）").selectOption(input.status);
+  await page.getByLabel("現在の段階（任意）").fill(input.stage);
+  await page.getByLabel("次のアクション").fill(input.nextAction);
+  await page.getByLabel("メモ").fill(input.note);
   await page.getByRole("button", { name: "更新する" }).click();
   await expect(page.getByRole("status")).toContainText("更新しました。");
-  await expect(page.getByText(/面接/).first()).toBeVisible();
-  await expect(page.getByText(/一次面接/).first()).toBeVisible();
+  const overview = page.getByRole("heading", { name: "現在の状況" }).locator("..");
+  await expect(overview).toContainText(input.expectedStatusText);
+  await expect(overview).toContainText(input.stage);
+}
+
+export async function updateApplicationToInterview(page: Page): Promise<void> {
+  assertMutationAllowed();
+  await updateApplication(page, {
+    status: "screening",
+    stage: "書類選考",
+    nextAction: "ES提出内容を確認し書類選考結果を待つ",
+    note: "E2E synthetic application: 書類選考フェーズへ更新",
+    expectedStatusText: "書類選考",
+  });
+  await updateApplication(page, {
+    status: "interview",
+    stage: "一次面接",
+    nextAction: "想定質問を確認して面接準備を行う",
+    note: "E2E synthetic application: 面接フェーズへ更新",
+    expectedStatusText: "面接",
+  });
 }
 
 export async function recordRejectedSelectionResult(page: Page): Promise<void> {
   assertMutationAllowed();
-  await page.getByLabel("ステータス変更（任意）").selectOption("rejected");
-  await page.getByLabel("現在の段階（任意）").fill("選考結果");
-  await page.getByLabel("次のアクション").fill("選考を振り返りペルソナへ反映する");
-  await page
-    .getByLabel("メモ")
-    .fill("E2E synthetic result: 面接経験を次の応募に反映するため落選結果を記録");
-  await page.getByRole("button", { name: "更新する" }).click();
-  await expect(page.getByRole("status")).toContainText("更新しました。");
-  await expect(page.getByText(/落選/).first()).toBeVisible();
+  await updateApplication(page, {
+    status: "rejected",
+    stage: "選考結果",
+    nextAction: "選考を振り返りペルソナへ反映する",
+    note: "E2E synthetic result: 面接経験を次の応募に反映するため落選結果を記録",
+    expectedStatusText: "落選",
+  });
   await expect(page.getByText(/面接 → 落選/)).toBeVisible();
 }
 
 export async function verifyApplicationTimeline(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "選考履歴" })).toBeVisible();
   await expect(page.getByText(/作成: 保存済み/)).toBeVisible();
-  await expect(page.getByText(/保存済み → 面接/)).toBeVisible();
+  await expect(page.getByText(/保存済み → 書類選考/)).toBeVisible();
+  await expect(page.getByText(/書類選考 → 面接/)).toBeVisible();
 }
 
 export async function verifyInterviewFilter(page: Page): Promise<void> {
