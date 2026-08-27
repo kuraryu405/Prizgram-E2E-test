@@ -1,0 +1,80 @@
+name: E2E Smoke Evidence
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Read-only target URL
+        required: false
+        default: https://prizgram.kuraryu.jp
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      E2E_BASE_URL: ${{ inputs.base_url || 'https://prizgram.kuraryu.jp' }}
+      E2E_ALLOW_MUTATION: 'false'
+      E2E_ALLOW_PRODUCTION: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run smoke tests and generate MP4 evidence
+        run: pnpm test:smoke
+
+      - name: Upload MP4 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-mp4-${{ github.run_id }}
+          path: |
+            artifacts/test-results/**/*.mp4
+            artifacts/test-results/**/evidence/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Playwright debug report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-debug-${{ github.run_id }}
+          path: |
+            artifacts/test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 7
