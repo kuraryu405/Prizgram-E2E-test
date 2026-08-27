@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../../src/support/test.js";
 import { newTestAccount, register } from "../../src/support/account.js";
 import { evidenceStep } from "../../src/support/evidence.js";
 import { assertMutationAllowed } from "../../src/support/env.js";
