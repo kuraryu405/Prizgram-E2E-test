@@ -1,6 +1,7 @@
 import { test } from "../../src/support/test.js";
 import {
   applyToCurrentJob,
+  createMinimalApplicationWithoutJob,
   updateApplicationToInterview,
   verifyApplicationTimeline,
   verifyInterviewFilter,
@@ -13,6 +14,16 @@ import { importSyntheticJob, openSyntheticJob } from "../../src/support/jobs.js"
 import { createPersonaFromFixture } from "../../src/support/persona.js";
 
 test.describe("S05 application lifecycle", () => {
+  test("register an active selection without a job posting", async ({ page }, testInfo) => {
+    assertMutationAllowed();
+    const account = newTestAccount("s05-minimal-application");
+    await register(page, account);
+
+    await evidenceStep(page, testInfo, "求人票なしで選考中企業を直接登録", async () => {
+      await createMinimalApplicationWithoutJob(page);
+    });
+  });
+
   test("apply to a job, update selection state and verify timeline", async ({ page }, testInfo) => {
     assertMutationAllowed();
     const account = newTestAccount("s05-application");
@@ -29,11 +40,11 @@ test.describe("S05 application lifecycle", () => {
       await verifyPinnedSnapshotAndDuplicateGuard(page);
     });
 
-    await evidenceStep(page, testInfo, "応募を一次面接フェーズへ更新", async () => {
+    await evidenceStep(page, testInfo, "書類選考を経て一次面接フェーズへ更新", async () => {
       await updateApplicationToInterview(page);
     });
 
-    await evidenceStep(page, testInfo, "選考履歴に作成と面接遷移を確認", async () => {
+    await evidenceStep(page, testInfo, "選考履歴に作成・書類選考・面接遷移を確認", async () => {
       await verifyApplicationTimeline(page);
     });
 
