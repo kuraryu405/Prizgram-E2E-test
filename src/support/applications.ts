@@ -10,6 +10,21 @@ export async function applyToCurrentJob(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "現在の状況" })).toBeVisible();
 }
 
+export async function verifyPinnedSnapshotAndDuplicateGuard(page: Page): Promise<void> {
+  const applicationUrl = page.url();
+  const snapshot = page.getByRole("heading", { name: "応募した求人" }).locator("..");
+  await expect(snapshot).toContainText(testJob.companyName);
+  await expect(snapshot).toContainText(
+    "応募時の求人情報を保持しているため、求人が後から更新されてもこの応募の記録は変わりません。",
+  );
+
+  await snapshot.getByRole("link", { name: "現在の求人詳細を見る" }).click();
+  await expect(page.getByRole("link", { name: "応募済み — 詳細を見る" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "応募する" })).toHaveCount(0);
+  await page.getByRole("link", { name: "応募済み — 詳細を見る" }).click();
+  await expect(page).toHaveURL(applicationUrl);
+}
+
 export async function updateApplicationToInterview(page: Page): Promise<void> {
   assertMutationAllowed();
   await page.getByLabel("ステータス変更（任意）").selectOption("interview");
