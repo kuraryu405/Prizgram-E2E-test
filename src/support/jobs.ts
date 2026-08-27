@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { testJob, updatedTestJobBody } from "../fixtures/job.js";
 import { assertMutationAllowed } from "./env.js";
+import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 export async function importSyntheticJob(page: Page): Promise<void> {
   assertMutationAllowed();
@@ -12,7 +13,7 @@ export async function importSyntheticJob(page: Page): Promise<void> {
   await page.getByRole("button", { name: "求人票を取り込む" }).click();
   await expect(
     page.getByRole("link", { name: new RegExp(testJob.companyName) }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
 }
 
 export async function openSyntheticJob(page: Page): Promise<void> {
@@ -24,7 +25,9 @@ export async function openSyntheticJob(page: Page): Promise<void> {
 export async function evaluateCurrentJob(page: Page): Promise<void> {
   assertMutationAllowed();
   await page.getByRole("button", { name: "この求人を評価する" }).click();
-  await expect(page.getByRole("heading", { name: "スキル適合" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "スキル適合" })).toBeVisible({
+    timeout: AI_RESULT_TIMEOUT,
+  });
   await expect(
     page.getByRole("heading", { name: "文化・価値観フィット" }),
   ).toBeVisible();
