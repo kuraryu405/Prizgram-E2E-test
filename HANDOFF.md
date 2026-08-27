@@ -1,91 +1,96 @@
 # HANDOFF
 
-Updated: 2026-08-28 04:56 JST
+Updated: 2026-08-28 05:04 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`
 - Branch: `main`
-- E2E code head before this HANDOFF-only commit: `c34c740589a70f8652e09b5c114a676eb61d7e9a`
-- Latest E2E code commit: `c34c740589a70f8652e09b5c114a676eb61d7e9a` (`test: retry transient Cloudflare failure in persona proposal`)
-- Golden uses production target `https://prizgram.kuraryu.jp` with explicit mutation + production opt-ins.
+- E2E code head before this HANDOFF-only commit: `49e96fe2206c92a34ea2fedbfe4067bee8544096`
+- Golden target: `https://prizgram.kuraryu.jp`
+- Final evidence remains one continuous Golden Journey with MP4 conversion.
 
 ## Golden Journey current step
 
 - Steps **01 through 07 completed successfully** in the latest production run.
 - Current first failing step: **08 面接想定質問から回答骨子と深掘りを生成**.
 - Latest completed evidence step: **07 ES AI支援で経験選択から下書き添削まで実行**.
-- The next run starts from step 01 because the final evidence video is intentionally one continuous Golden Journey.
+- Step 08 progressed beyond expected-question generation and answer-outline generation; the current failure is **interview follow-up generation**.
 
 ## Latest error summary
 
-At Step 08, `POST /api/applications/:id/interview-questions` returned a Cloudflare-generated HTML 502 page:
+`POST /api/applications/:id/interview-followup` returned a Cloudflare-generated HTML 502 on all 3 safe retry attempts.
 
-- HTTP status: `502 Bad gateway`
+Final retry diagnostics:
+
+- HTTP: `502 Bad gateway`
+- `content-type=text/html; charset=UTF-8`
+- `server=cloudflare`
+- `cf-ray=a31dab9ebd53a0b5-NRT`
 - HTML title: `kuraryu.jp | 502: Bad gateway`
-- Body contains Cloudflare 5xx landing page markup (`cf-wrapper`, `cf-error-details`).
-- Error page timestamp: **2026-08-27 19:52:09 UTC** / **2026-08-28 04:52:09 JST**.
-- This was not an application JSON `UPSTREAM_INVALID_RESPONSE` response.
+- Cloudflare error page timestamp: **2026-08-27 20:02:00 UTC / 2026-08-28 05:02:00 JST**
+- Golden duration before failure: about **4.2 minutes**
 
-Relevant stack:
-
-`generateInterviewQuestions -> runAndRequireAiResponse -> requireSuccessfulResponse`
-
-The run lasted about 2.5 minutes and produced evidence screenshots for Steps 01-07 plus failed-run WebM/MP4/trace.
+The E2E retry helper already distinguishes Cloudflare HTML 502 from application JSON 5xx. This failure satisfied the Cloudflare HTML condition three consecutive times.
 
 ## Classification
 
-- E2E-origin: **No for the observed 502**. The E2E correctly surfaced an actual Cloudflare HTML 502.
-- Prizgram-body-origin: **No new product-body defect proven by this failure**.
-- Production infra-origin: **Yes / currently most likely**. The response itself was a Cloudflare-generated HTML 502.
-- E2E hardening applied: **Yes**. Safe/pure AI generation calls now retry only Cloudflare-generated HTML 502 up to 3 attempts. App JSON errors and schema failures still fail immediately.
+- E2E-origin: **No** for the observed failure. The E2E behaved as designed and exhausted the bounded safe retry policy.
+- Prizgram-body-origin: **Not proven by this failure**.
+- Production infra-origin: **Yes / strongest current classification**.
+- Existing infra issue: **Prizgram #301**.
 
-## E2E changes made in this phase
+Do **not** increase retry count merely to make Golden pass. A 3x repeated Cloudflare HTML 502 is treated as an actual production blocker.
 
-1. `src/support/api-waits.ts`
-   - Added `runAndRequireRetryableAiResponse`.
-   - Retries only Cloudflare HTML 502 for AI operations explicitly known to be safe to repeat.
-   - Maximum 3 attempts.
-   - Non-Cloudflare errors fail immediately.
-   - Final repeated Cloudflare failure includes non-secret diagnostic headers: `content-type`, `server`, `cf-ray`, `cf-error-type`, `cf-error-origin` when present.
+## E2E hardening already present
 
-2. `src/support/interview.ts`
-   - Interview expected-question generation, answer-outline generation, and follow-up generation use the safe retry helper.
-   - These server operations are pure generation and do not persist DB mutations.
+Safe/pure AI generation calls retry only Cloudflare-generated HTML 502 up to 3 attempts:
 
-3. `src/support/es-ai.ts`
-   - ES episode search, draft generation, and revision generation use the safe retry helper.
-   - Document creation/save/edit remain on non-retrying mutation paths.
+- ES episode search / draft generation / revision generation
+- Interview expected questions / answer outline / follow-up generation
+- Persona update proposal generation
 
-4. `src/support/persona-update.ts`
-   - Persona update **proposal generation only** uses the safe retry helper.
-   - Approval and re-evaluation remain on the existing mutation-aware paths and are not blindly retried.
+Application JSON errors, schema failures, and mutating operations are not blindly retried.
 
-## Commits in this phase
+## Current E2E commits
 
-- `6d94415ee6800fee367e454f44200bbdae38f186` — add retryable safe-AI Cloudflare handling.
-- `3c9dc21363a69d27acae0c53e3c8f7935c45a25e` — apply it to interview AI.
-- `a6578e136ab924de7361403e77bd2abaa7be9d45` — simplify diagnostic-header collection for TypeScript safety.
-- `ea32d74ec176efe1238c21c9fe8865747eaedf42` — apply it to ES AI pure generation.
-- `c34c740589a70f8652e09b5c114a676eb61d7e9a` — apply it to persona update proposal generation.
+- `6d94415ee6800fee367e454f44200bbdae38f186` — add safe-AI Cloudflare retry helper
+- `3c9dc21363a69d27acae0c53e3c8f7935c45a25e` — apply helper to interview AI
+- `a6578e136ab924de7361403e77bd2abaa7be9d45` — simplify diagnostic header collection
+- `ea32d74ec176efe1238c21c9fe8865747eaedf42` — apply helper to ES AI
+- `c34c740589a70f8652e09b5c114a676eb61d7e9a` — apply helper to persona proposal
+- `49e96fe2206c92a34ea2fedbfe4067bee8544096` — previous HANDOFF checkpoint
 
 ## Prizgram issues
 
-- #300 — production LLM scoring schema validation failure. Existing issue; do not duplicate.
-- #301 — Cloudflare HTML 502 / infra investigation. **Open and updated with the Step 08 reproduction at 2026-08-27 19:52:09 UTC.** The new reproduction proves the HTML 502 can occur on interview AI as well as job scoring, so it may be cross-cutting for long LLM requests rather than score-specific.
-- #302 — ES answer onBlur save vs submit race. Existing issue/fix history.
-- #303 — application update success message lost after refresh. Existing issue/fix history.
+- #300 — LLM scoring schema validation failure; existing/fix history.
+- #301 — Cloudflare HTML 502 / infra investigation. **Updated again** with the Step 08 follow-up failure, error-page timestamp `2026-08-27 20:02:00 UTC`, and `cf-ray=a31dab9ebd53a0b5-NRT`.
+- #302 — ES answer onBlur save vs submit race; existing/fix history.
+- #303 — application update success message lost after refresh; existing/fix history.
 
-## Unresolved items
+## Unresolved blocker
 
-1. Run `pnpm typecheck` on the new E2E head.
-2. Re-run the production Golden Journey.
-3. If a single/transient Cloudflare HTML 502 occurs in a pure-generation AI step, the E2E should retry and continue.
-4. If Cloudflare HTML 502 occurs 3 times for the same safe AI operation, keep it as a #301 infra failure; do not increase retries indefinitely.
-5. If an application JSON 5xx or schema failure occurs, fail immediately and classify as Prizgram body/product unless existing issue coverage applies.
-6. Continue the first-failure loop until all 14 steps pass and final MP4 evidence is produced.
+Before spending more time on repeated full Golden runs, investigate #301 at the exact failing time.
 
-## Next command
+Read-only production checks around **2026-08-27 20:01:00–20:03:00 UTC**:
+
+```bash
+journalctl --user -u prizgram-web.service \
+  --since "2026-08-27 20:01:00" \
+  --until "2026-08-27 20:03:00" --no-pager
+
+journalctl --user -u cloudflared-prizgram.service \
+  --since "2026-08-27 20:01:00" \
+  --until "2026-08-27 20:03:00" --no-pager
+
+systemctl --user show prizgram-web.service \
+  -p ActiveState -p SubState -p ExecMainStartTimestamp \
+  -p ExecMainExitTimestamp -p ExecMainCode -p ExecMainStatus -p NRestarts
+```
+
+Correlate with `cf-ray=a31dab9ebd53a0b5-NRT` if Cloudflare analytics are available.
+
+## Next Golden command after infra is stable / investigated
 
 ```bash
 git pull --ff-only
@@ -98,17 +103,18 @@ E2E_ALLOW_PRODUCTION=true \
 pnpm test:golden
 ```
 
-## If the next run fails, inspect these first
+## If the next Golden passes Step 08
 
-- Step 08 / 09: `src/support/interview.ts`, `src/support/api-waits.ts`
+Continue first-failure triage:
+
+- Step 09: `src/support/interview.ts`
 - Step 10: `src/support/applications.ts`
-- Step 11 / 12: `src/support/persona-update.ts`, corresponding Prizgram persona-update routes/service
+- Step 11 / 12: `src/support/persona-update.ts`
 - Step 13: `src/support/dashboard.ts`
-- Step 14: `tests/acceptance/golden-journey.spec.ts`, account/session helpers; scope any persona-version assertion to the intended section if strict-mode text collisions appear
-- Cross-cutting Cloudflare failures: capture the final retry diagnostics and update #301
+- Step 14: final session/persistence assertions
 
 ## Required cycle
 
 `run -> diagnose first failure -> smallest safe fix -> typecheck -> commit/push -> update HANDOFF.md -> rerun`
 
-Do not modify Prizgram body code from the E2E debugging loop. For Prizgram body/infra defects, update or create an issue instead. Do not hide real product errors with E2E retries.
+Do not modify Prizgram body code from this E2E loop. Product/infra defects belong in Prizgram issues. Do not hide actual production failures with unlimited retries.
