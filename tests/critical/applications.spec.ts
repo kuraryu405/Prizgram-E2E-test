@@ -4,6 +4,7 @@ import {
   updateApplicationToInterview,
   verifyApplicationTimeline,
   verifyInterviewFilter,
+  verifyPinnedSnapshotAndDuplicateGuard,
 } from "../../src/support/applications.js";
 import { newTestAccount, register } from "../../src/support/account.js";
 import { evidenceStep } from "../../src/support/evidence.js";
@@ -22,6 +23,10 @@ test.describe("S05 application lifecycle", () => {
 
     await evidenceStep(page, testInfo, "求人から応募を作成", async () => {
       await applyToCurrentJob(page);
+    });
+
+    await evidenceStep(page, testInfo, "応募時求人snapshotと二重応募防止を確認", async () => {
+      await verifyPinnedSnapshotAndDuplicateGuard(page);
     });
 
     await evidenceStep(page, testInfo, "応募を一次面接フェーズへ更新", async () => {
