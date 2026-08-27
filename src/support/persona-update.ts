@@ -4,6 +4,7 @@ import {
   apiResponseMatcher,
   requireSuccessfulResponse,
   runAndRequireAiResponse,
+  runAndRequireRetryableAiResponse,
 } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
@@ -54,7 +55,7 @@ export async function proposePersonaUpdate(page: Page): Promise<void> {
   await applicationSelect.selectOption(applicationId);
   await page.getByLabel("振り返りメモ").fill(personaUpdateReflection);
 
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher("POST", /^\/api\/persona\/update\/propose$/),
     "Persona update proposal",
