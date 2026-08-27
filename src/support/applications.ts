@@ -2,6 +2,43 @@ import { expect, type Page } from "@playwright/test";
 import { testJob } from "../fixtures/job.js";
 import { assertMutationAllowed } from "./env.js";
 
+export const minimalApplicationCompany = "E2E Direct Selection株式会社";
+export const minimalApplicationRole = "Software Engineer Internship";
+
+export async function createMinimalApplicationWithoutJob(page: Page): Promise<void> {
+  assertMutationAllowed();
+  await page.goto("/app/applications");
+  const form = page.getByRole("heading", { name: "選考中の企業を追加" }).locator("..");
+  await form.getByLabel("企業名").fill(minimalApplicationCompany);
+  await form.getByLabel("職種 / コース名（任意）").fill(minimalApplicationRole);
+  await form.getByLabel("現在のステータス").selectOption("interview");
+  await form.getByLabel("現在の段階（任意）").fill("二次面接");
+  await form.getByLabel("次のアクション（任意）").fill("面接準備を行う");
+  await form.getByLabel("メモ（任意）").fill("E2E synthetic direct selection");
+  await form.getByRole("button", { name: "応募を追加" }).click();
+
+  const success = form.getByRole("status");
+  await expect(success).toContainText("応募を追加しました。");
+  await expect(success.getByRole("link", { name: "締切を追加" })).toBeVisible();
+
+  const list = page.getByRole("heading", { name: "応募一覧" }).locator("..");
+  const card = list.getByRole("link", { name: new RegExp(minimalApplicationCompany) });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(minimalApplicationRole);
+  await expect(card).toContainText("面接");
+  await expect(card).toContainText("段階: 二次面接");
+  await expect(card).toContainText("次のアクション: 面接準備を行う");
+
+  await card.click();
+  await expect(page.getByRole("heading", { name: minimalApplicationCompany })).toBeVisible();
+  const overview = page.getByRole("heading", { name: "現在の状況" }).locator("..");
+  await expect(overview).toContainText("面接");
+  await expect(overview).toContainText("二次面接");
+  await expect(page.getByRole("heading", { name: "最新メモ" }).locator("..")).toContainText(
+    "E2E synthetic direct selection",
+  );
+}
+
 export async function applyToCurrentJob(page: Page): Promise<void> {
   assertMutationAllowed();
   await page.getByRole("button", { name: "応募する" }).click();
