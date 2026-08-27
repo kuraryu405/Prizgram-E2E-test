@@ -24,8 +24,30 @@ export async function openSyntheticJob(page: Page): Promise<void> {
 
 export async function evaluateCurrentJob(page: Page): Promise<void> {
   assertMutationAllowed();
+
+  const scoreResponsePromise = page.waitForResponse(
+    (response) => {
+      if (response.request().method() !== "POST") return false;
+      try {
+        return /\/api\/jobs\/[^/]+\/score$/.test(new URL(response.url()).pathname);
+      } catch {
+        return false;
+      }
+    },
+    { timeout: AI_RESULT_TIMEOUT },
+  );
+
   await page.getByRole("button", { name: "この求人を評価する" }).click();
-  const scoreSection = page.getByRole("heading", { name: "3軸評価" }).locator("..");
+  const scoreResponse = await scoreResponsePromise;
+
+  if (!scoreResponse.ok()) {
+    const body = await scoreResponse.text().catch(() => "<response body unavailable>");
+    throw new Error(
+      `Job scoring failed: HTTP ${scoreResponse.status()} ${scoreResponse.statusText()}\n${body}`,
+    );
+  }
+
+  const scoreSection = page.getByRole("region", { name: "3軸評価" });
   await expect(scoreSection.getByRole("heading", { name: "スキル適合" })).toBeVisible({
     timeout: AI_RESULT_TIMEOUT,
   });
