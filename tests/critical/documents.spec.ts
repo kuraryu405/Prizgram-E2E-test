@@ -6,13 +6,14 @@ import {
   createManualDocument,
   renameManualDocument,
   submitManualDocument,
+  verifyManualDocumentPersists,
 } from "../../src/support/documents.js";
 import { evidenceStep } from "../../src/support/evidence.js";
 import { assertMutationAllowed } from "../../src/support/env.js";
 import { importSyntheticJob, openSyntheticJob } from "../../src/support/jobs.js";
 
 test.describe("S07 application documents manual flow", () => {
-  test("create, rename, edit and submit an ES document", async ({ page }, testInfo) => {
+  test("create, rename, edit, persist and submit an ES document", async ({ page }, testInfo) => {
     assertMutationAllowed();
     const account = newTestAccount("s07-documents");
     await register(page, account);
@@ -32,7 +33,11 @@ test.describe("S07 application documents manual flow", () => {
       await addAndEditManualEntry(page);
     });
 
-    await evidenceStep(page, testInfo, "ES書類を提出済みにする", async () => {
+    await evidenceStep(page, testInfo, "reload後もES書類と編集回答が保持", async () => {
+      await verifyManualDocumentPersists(page);
+    });
+
+    await evidenceStep(page, testInfo, "ES書類を提出済みにしてreload後も固定", async () => {
       await submitManualDocument(page);
     });
   });
