@@ -1,5 +1,10 @@
 import { expect, type Page, type Response } from "@playwright/test";
 import { testJob, updatedTestJobBody } from "../fixtures/job.js";
+import {
+  apiResponseMatcher,
+  runAndRequireAiResponse,
+  runAndRequireResponse,
+} from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
@@ -14,10 +19,17 @@ export async function importSyntheticJob(page: Page): Promise<void> {
   await page.getByLabel("会社名（任意）").fill(testJob.companyName);
   await page.getByLabel("出典名（任意）").fill(testJob.sourceName);
   await page.getByLabel("出典URL（任意）").fill(testJob.sourceUrl);
-  await page.getByRole("button", { name: "求人票を取り込む" }).click();
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/jobs$/),
+    "Synthetic job import",
+    async () => {
+      await page.getByRole("button", { name: "求人票を取り込む" }).click();
+    },
+  );
   await expect(
     page.getByRole("link", { name: new RegExp(testJob.companyName) }),
-  ).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+  ).toBeVisible();
 }
 
 export async function openSyntheticJob(page: Page): Promise<void> {
@@ -112,7 +124,7 @@ export async function evaluateCurrentJob(page: Page): Promise<void> {
   // server-rendered persisted score can briefly coexist. Assert only against
   // .score-current so strict-mode locators never race that duplicate DOM.
   const currentScore = scoreSection.locator(".score-current");
-  await expect(currentScore).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+  await expect(currentScore).toBeVisible();
 
   for (const axisName of [
     "スキル適合",
@@ -136,7 +148,14 @@ export async function evaluateCurrentJob(page: Page): Promise<void> {
 export async function addSyntheticJobVersion(page: Page): Promise<void> {
   assertMutationAllowed();
   await page.getByLabel("求人本文").last().fill(updatedTestJobBody);
-  await page.getByRole("button", { name: "新バージョンとして追加" }).click();
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/jobs$/),
+    "Synthetic job re-import",
+    async () => {
+      await page.getByRole("button", { name: "新バージョンとして追加" }).click();
+    },
+  );
   await expect(page.getByRole("status")).toContainText(/新しいバージョン v\d+ を追加しました/);
   await page.reload();
   await expect(page.getByRole("heading", { name: "バージョン履歴" })).toBeVisible();
@@ -145,7 +164,14 @@ export async function addSyntheticJobVersion(page: Page): Promise<void> {
 
 export async function archiveAndRestoreSyntheticJob(page: Page): Promise<void> {
   assertMutationAllowed();
-  await page.getByRole("button", { name: "求人をアーカイブ" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("PATCH", /^\/api\/jobs\/[^/]+$/),
+    "Job archive",
+    async () => {
+      await page.getByRole("button", { name: "求人をアーカイブ" }).click();
+    },
+  );
   await expect(page).toHaveURL(/\/app\/jobs(?:$|[/?#])/);
   const archivedSection = page.getByRole("heading", { name: "アーカイブ済み" }).locator("..");
   await expect(
@@ -154,7 +180,15 @@ export async function archiveAndRestoreSyntheticJob(page: Page): Promise<void> {
   await archivedSection
     .getByRole("link", { name: new RegExp(testJob.companyName) })
     .click();
-  await page.getByRole("button", { name: "求人を復元" }).click();
+
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("PATCH", /^\/api\/jobs\/[^/]+$/),
+    "Job restore",
+    async () => {
+      await page.getByRole("button", { name: "求人を復元" }).click();
+    },
+  );
   await expect(page).toHaveURL(/\/app\/jobs(?:$|[/?#])/);
   await expect(
     page.getByRole("heading", { name: "取り込み済みの求人" }).locator("..").getByRole("link", {
