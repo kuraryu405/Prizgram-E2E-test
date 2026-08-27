@@ -50,6 +50,16 @@ export async function addAndEditManualEntry(page: Page): Promise<void> {
   );
 }
 
+export async function verifyManualDocumentPersists(page: Page): Promise<void> {
+  await page.reload();
+  const card = documentCard(page, editedDocumentTitle);
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel(new RegExp(manualQuestion))).toHaveValue(
+    editedManualAnswer,
+  );
+  await expect(card).toContainText("ユーザー編集");
+}
+
 export async function submitManualDocument(page: Page): Promise<void> {
   assertMutationAllowed();
   let card = documentCard(page, editedDocumentTitle);
@@ -58,4 +68,9 @@ export async function submitManualDocument(page: Page): Promise<void> {
   await expect(card).toContainText("提出済み");
   await expect(card.getByLabel(new RegExp(manualQuestion))).toBeDisabled();
   await expect(card.getByRole("button", { name: "設問を追加" })).toHaveCount(0);
+
+  await page.reload();
+  card = documentCard(page, editedDocumentTitle);
+  await expect(card).toContainText("提出済み");
+  await expect(card.getByLabel(new RegExp(manualQuestion))).toBeDisabled();
 }
