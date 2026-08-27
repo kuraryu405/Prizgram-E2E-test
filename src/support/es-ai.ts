@@ -2,8 +2,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import {
   apiResponseMatcher,
   requireSuccessfulResponse,
-  runAndRequireAiResponse,
   runAndRequireResponse,
+  runAndRequireRetryableAiResponse,
 } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 
@@ -40,7 +40,7 @@ export async function findEsEpisodes(page: Page): Promise<void> {
   const section = aiSection(page);
   await section.getByLabel("設問").fill(aiQuestion);
   await section.getByLabel("文字数制限").fill(String(aiCharacterLimit));
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher("POST", /^\/api\/applications\/[^/]+\/es-episodes$/),
     "ES episode search",
@@ -58,7 +58,7 @@ export async function findEsEpisodes(page: Page): Promise<void> {
 export async function generateAndHumanEditDraft(page: Page): Promise<string> {
   assertMutationAllowed();
   const section = aiSection(page);
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher("POST", /^\/api\/applications\/[^/]+\/es-draft$/),
     "ES draft generation",
@@ -114,7 +114,7 @@ export async function saveAiDraftAndRevise(page: Page, expectedDraft: string): P
   await expect(entry).toHaveValue(userEdited);
   await expect(card).toContainText("ユーザー編集");
 
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher("POST", /^\/api\/applications\/[^/]+\/es-revision$/),
     "ES revision",
