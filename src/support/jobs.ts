@@ -131,10 +131,13 @@ export async function evaluateCurrentJob(page: Page): Promise<void> {
     "文化・価値観フィット",
     "難易度ギャップ",
   ] as const) {
-    const axis = currentScore
-      .locator("li.axis-item")
-      .filter({ has: currentScore.getByRole("heading", { name: axisName, exact: true }) });
+    // Playwright's `has` locator is evaluated relative to each candidate.
+    // Passing a locator already rooted at currentScore makes the condition
+    // impossible to satisfy. Filter the axis item by its own text instead,
+    // then assert the exact heading inside that item.
+    const axis = currentScore.locator("li.axis-item").filter({ hasText: axisName });
     await expect(axis).toHaveCount(1);
+    await expect(axis.getByRole("heading", { name: axisName, exact: true })).toBeVisible();
     await expect(axis.locator(".axis-score")).toContainText(/\d+\s*\/\s*100/);
     await expect(axis).toContainText("根拠:");
     await expect(axis.locator("ul").nth(0).getByRole("listitem").first()).toBeVisible();
