@@ -1,9 +1,6 @@
 name: E2E Smoke Evidence
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
       base_url:
