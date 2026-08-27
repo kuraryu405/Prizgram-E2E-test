@@ -39,9 +39,14 @@ async function assertFfmpeg() {
 }
 
 async function convertVideos() {
-  await assertFfmpeg();
   const webmFiles = (await walk(resultsDir)).filter((path) => path.endsWith(".webm"));
+  if (webmFiles.length === 0) {
+    process.stdout.write("No Playwright WebM recordings were produced; MP4 conversion skipped.\n");
+    return;
+  }
 
+  await assertFfmpeg();
+  let converted = 0;
   for (const webm of webmFiles) {
     const finalMp4 = webm.replace(/\.webm$/, ".mp4");
     const tempMp4 = `${finalMp4}.tmp.mp4`;
@@ -66,8 +71,10 @@ async function convertVideos() {
       throw new Error(`ffmpeg failed for ${webm}`);
     }
     await rename(tempMp4, finalMp4);
+    converted += 1;
     process.stdout.write(`MP4 evidence: ${finalMp4}\n`);
   }
+  process.stdout.write(`Converted ${converted} Playwright recording(s) to MP4. Raw WebM is retained for Playwright report compatibility.\n`);
 }
 
 const playwrightArgs = process.argv.slice(2);
