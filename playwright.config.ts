@@ -2,6 +2,8 @@ import "dotenv/config";
 import { defineConfig } from "@playwright/test";
 import { getBaseUrl } from "./src/support/env.js";
 
+const humanPaced = process.env.E2E_HUMAN_PACE === "true";
+
 export default defineConfig({
   testDir: "./tests",
   outputDir: "./artifacts/test-results",
@@ -27,5 +29,10 @@ export default defineConfig({
     video: "on",
     locale: "ja-JP",
     timezoneId: "Asia/Tokyo",
+    launchOptions: {
+      // Evidence/demo runs should remain readable to a human viewer without
+      // slowing down the normal verification suites.
+      slowMo: humanPaced ? 300 : 0,
+    },
   },
 });
