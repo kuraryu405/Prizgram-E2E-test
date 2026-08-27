@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { assertMutationAllowed } from "./env.js";
+import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 export const aiDocumentTitle = "E2E AI ES";
 export const aiQuestion = "学生時代に最も力を入れたことを400文字以内で教えてください";
@@ -26,7 +27,7 @@ export async function findEsEpisodes(page: Page): Promise<void> {
   await section.getByLabel("文字数制限").fill("400");
   await section.getByRole("button", { name: "使えそうな経験を探す" }).click();
   const candidate = section.locator('li[role="button"]').first();
-  await expect(candidate).toBeVisible();
+  await expect(candidate).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
   await expect(candidate).toContainText(/関連:|根拠:|evidence:/);
   await candidate.click();
 }
@@ -36,7 +37,7 @@ export async function generateAndHumanEditDraft(page: Page): Promise<string> {
   const section = aiSection(page);
   await section.getByRole("button", { name: "この経験で下書きを作る" }).click();
   const preview = section.getByLabel("AI生成結果");
-  await expect(preview).toBeVisible();
+  await expect(preview).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
   const generated = await preview.inputValue();
   expect(generated.trim().length).toBeGreaterThan(0);
   const humanEdited = `${generated.slice(0, 360).trim()} E2Eで内容を確認・編集しました。`;
@@ -66,5 +67,7 @@ export async function saveAiDraftAndRevise(page: Page, expectedDraft: string): P
   await expect(card).toContainText("ユーザー編集");
 
   await card.getByRole("button", { name: "AI添削" }).click();
-  await expect(card.getByText("添削案", { exact: true })).toBeVisible();
+  await expect(card.getByText("添削案", { exact: true })).toBeVisible({
+    timeout: AI_RESULT_TIMEOUT,
+  });
 }
