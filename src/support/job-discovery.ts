@@ -1,10 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  apiResponseMatcher,
+  runAndRequireAiResponse,
+  runAndRequireResponse,
+} from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
-async function waitForDiscoverySettled(page: Page): Promise<void> {
-  const resultsHeading = page.getByRole("heading", { name: /検索結果\s+[\d,]+件/ });
-  await expect(resultsHeading).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+const DISCOVERY_RESPONSE_TIMEOUT_MS = 45_000;
+
+async function runDiscovery(page: Page): Promise<void> {
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/jobs\/discover$/),
+    "Job discovery",
+    async () => {
+      await page.getByRole("button", { name: "求人を探す" }).click();
+    },
+    DISCOVERY_RESPONSE_TIMEOUT_MS,
+  );
+  await expect(
+    page.getByRole("heading", { name: /検索結果\s+[\d,]+件/ }),
+  ).toBeVisible();
 }
 
 async function verifyProviderSummary(page: Page): Promise<void> {
@@ -28,15 +45,13 @@ export async function verifyDiscoveryFiltersReset(page: Page): Promise<void> {
 
 export async function discoverJobs(page: Page): Promise<number> {
   assertMutationAllowed();
-  await page.getByRole("button", { name: "求人を探す" }).click();
-  await waitForDiscoverySettled(page);
+  await runDiscovery(page);
   await verifyProviderSummary(page);
   let count = await page.getByRole("article").count();
 
   if (count === 0) {
     await page.getByLabel("キーワード（任意）").fill("software engineer");
-    await page.getByRole("button", { name: "求人を探す" }).click();
-    await waitForDiscoverySettled(page);
+    await runDiscovery(page);
     await verifyProviderSummary(page);
     count = await page.getByRole("article").count();
   }
@@ -55,15 +70,26 @@ export async function importAndEvaluateFirstCandidate(page: Page): Promise<void>
   assertMutationAllowed();
   const candidate = page.getByRole("article").first();
   await expect(candidate).toBeVisible();
-  await candidate.getByRole("button", { name: "取り込む" }).click();
-  await expect(candidate.getByRole("button", { name: "取り込み済み" })).toBeDisabled({
-    timeout: AI_RESULT_TIMEOUT,
-  });
 
-  await candidate.getByRole("button", { name: "3軸で評価" }).click();
-  await expect(candidate.getByRole("group", { name: "3軸評価結果" })).toBeVisible({
-    timeout: AI_RESULT_TIMEOUT,
-  });
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/jobs$/),
+    "Discovered job import",
+    async () => {
+      await candidate.getByRole("button", { name: "取り込む" }).click();
+    },
+  );
+  await expect(candidate.getByRole("button", { name: "取り込み済み" })).toBeDisabled();
+
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/jobs\/[^/]+\/score$/),
+    "Discovered job scoring",
+    async () => {
+      await candidate.getByRole("button", { name: "3軸で評価" }).click();
+    },
+  );
+  await expect(candidate.getByRole("group", { name: "3軸評価結果" })).toBeVisible();
   await expect(candidate).toContainText("スキル適合");
   await expect(candidate).toContainText("カルチャー適合");
   await expect(candidate).toContainText("難易度ギャップ");
@@ -97,7 +123,24 @@ export async function bulkImportRemainingCandidates(page: Page): Promise<void> {
     name: new RegExp(`選択した${enabledCount}件を取り込む`),
   });
   await bulkButton.click();
+
+  // Bulk import may issue several LLM-backed /api/jobs requests concurrently.
+  // Do not time-limit those requests, but stop waiting as soon as the UI says
+  // the batch has completed; then classify the resulting toast explicitly.
+  const busyButton = page.getByRole("button", { name: "取り込み中…" });
+  await expect(busyButton).toBeVisible();
+  await expect(busyButton).toHaveCount(0, { timeout: AI_RESULT_TIMEOUT });
+
+  const allFailed = page.getByRole("alert").filter({
+    hasText: /件の取り込みに失敗しました/,
+  });
+  if (await allFailed.isVisible().catch(() => false)) {
+    throw new Error((await allFailed.textContent())?.trim() || "Bulk job import failed");
+  }
+
   await expect(
-    page.getByText(new RegExp(`${enabledCount}件を取り込みました|${enabledCount}件中`)),
-  ).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+    page.getByRole("status").filter({
+      hasText: /件を取り込みました|件中\d+件を取り込みました/,
+    }),
+  ).toBeVisible();
 }
