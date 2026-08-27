@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
+import { apiResponseMatcher, runAndRequireResponse } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 
 export const reminderCompany = "E2E Reminder株式会社";
@@ -36,9 +37,16 @@ export async function createReminderEligibleDeadline(page: Page): Promise<void> 
   await form.getByLabel("現在のステータス").selectOption("interview");
   await form.getByLabel("現在の段階（任意）").fill("一次面接前");
   await form.getByLabel("次のアクション（任意）").fill("ESを提出する");
-  await form.getByRole("button", { name: "応募を追加" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/applications\/minimal$/),
+    "Reminder application creation",
+    async () => {
+      await form.getByRole("button", { name: "応募を追加" }).click();
+    },
+  );
   const status = form.getByRole("status");
-  await expect(status).toContainText("応募を追加しました");
+  await expect(status.getByRole("link", { name: "締切を追加" })).toBeVisible();
   await status.getByRole("link", { name: "締切を追加" }).click();
 
   await page.getByLabel("種別").selectOption("document");
@@ -46,7 +54,14 @@ export async function createReminderEligibleDeadline(page: Page): Promise<void> 
   await page
     .getByLabel(/期限（Asia\/Tokyoの現地時刻）/)
     .fill(tokyoDateTimeLocal(30));
-  await page.getByRole("button", { name: "締切を登録" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/deadlines$/),
+    "Reminder deadline creation",
+    async () => {
+      await page.getByRole("button", { name: "締切を登録" }).click();
+    },
+  );
   await expect(page.getByText(reminderDeadlineTitle, { exact: true })).toBeVisible();
 }
 
@@ -102,7 +117,14 @@ export async function verifyAndDismissReminder(page: Page): Promise<void> {
   await expect(card).toBeVisible();
   await expect(card.getByText(/優先度:/)).toBeVisible();
   await expect(card.getByText(/検知時刻:/)).toBeVisible();
-  await card.getByRole("button", { name: "解除" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/reminders\/[^/]+\/dismiss$/),
+    "Reminder dismissal",
+    async () => {
+      await card.getByRole("button", { name: "解除" }).click();
+    },
+  );
   await expect(card).toHaveCount(0);
   await page.reload();
   await expect(page.locator("li.card").filter({ hasText: reminderDeadlineTitle })).toHaveCount(0);
