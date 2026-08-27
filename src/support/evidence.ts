@@ -2,6 +2,8 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { test, type Page, type TestInfo } from "@playwright/test";
 
+import { showcasePageForViewer } from "./pacing.js";
+
 function slugify(value: string): string {
   return value
     .normalize("NFKC")
@@ -18,6 +20,8 @@ export async function evidenceStep(
 ): Promise<void> {
   await test.step(name, async () => {
     await action();
+    await showcasePageForViewer(page);
+
     const path = testInfo.outputPath(
       `evidence/${String(testInfo.attachments.length + 1).padStart(2, "0")}-${slugify(name)}.png`,
     );
