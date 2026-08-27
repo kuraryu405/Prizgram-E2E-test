@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { assertMutationAllowed } from "./env.js";
+import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 export const interviewQuestionAsked = "チーム開発で最も難しかったことは何ですか？";
 export const interviewAnswerNotes =
@@ -21,7 +22,9 @@ export async function generateInterviewQuestions(page: Page): Promise<void> {
   const card = interviewCard(page);
   await card.getByLabel("現在の選考段階").fill("一次面接");
   await card.getByRole("button", { name: "想定質問を生成" }).click();
-  await expect(card.getByRole("heading", { name: "想定質問" })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "想定質問" })).toBeVisible({
+    timeout: AI_RESULT_TIMEOUT,
+  });
   await expect(card.getByRole("button", { name: "回答を組み立てる" }).first()).toBeVisible();
 }
 
@@ -29,9 +32,13 @@ export async function generateInterviewOutlineAndFollowup(page: Page): Promise<v
   assertMutationAllowed();
   const card = interviewCard(page);
   await card.getByRole("button", { name: "回答を組み立てる" }).first().click();
-  await expect(card.getByRole("heading", { name: "回答骨子" })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "回答骨子" })).toBeVisible({
+    timeout: AI_RESULT_TIMEOUT,
+  });
   await card.getByRole("button", { name: "深掘りを見る" }).click();
-  await expect(card.getByText("深掘り候補", { exact: true })).toBeVisible();
+  await expect(card.getByText("深掘り候補", { exact: true })).toBeVisible({
+    timeout: AI_RESULT_TIMEOUT,
+  });
 }
 
 export async function saveInterviewReflection(page: Page): Promise<void> {
