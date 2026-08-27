@@ -4,15 +4,16 @@ import { newTestAccount, register } from "../../src/support/account.js";
 import {
   completeRestoreAndDeleteDeadline,
   createDeadlineForCurrentApplication,
+  createInterviewDeadlineForCurrentApplication,
   editDeadline,
-  verifyDeadlineInApplicationAndDashboard,
+  verifyBothDeadlinesInApplicationAndDashboard,
 } from "../../src/support/deadlines.js";
 import { evidenceStep } from "../../src/support/evidence.js";
 import { assertMutationAllowed } from "../../src/support/env.js";
 import { importSyntheticJob, openSyntheticJob } from "../../src/support/jobs.js";
 
 test.describe("S06 deadline lifecycle", () => {
-  test("create, surface, edit, complete, restore and delete a deadline", async ({ page }, testInfo) => {
+  test("create ES/interview deadlines, surface, edit, complete, restore and delete", async ({ page }, testInfo) => {
     assertMutationAllowed();
     const account = newTestAccount("s06-deadline");
     await register(page, account);
@@ -20,19 +21,20 @@ test.describe("S06 deadline lifecycle", () => {
     await openSyntheticJob(page);
     await applyToCurrentJob(page);
 
-    await evidenceStep(page, testInfo, "応募にES締切を登録", async () => {
+    await evidenceStep(page, testInfo, "応募にES締切と面接予定を登録", async () => {
       await createDeadlineForCurrentApplication(page);
+      await createInterviewDeadlineForCurrentApplication(page);
     });
 
-    await evidenceStep(page, testInfo, "応募詳細とダッシュボードへの締切反映を確認", async () => {
-      await verifyDeadlineInApplicationAndDashboard(page);
+    await evidenceStep(page, testInfo, "応募詳細とダッシュボードへ両方の締切が反映", async () => {
+      await verifyBothDeadlinesInApplicationAndDashboard(page);
     });
 
-    await evidenceStep(page, testInfo, "締切タイトルと期限を編集", async () => {
+    await evidenceStep(page, testInfo, "ES締切タイトルと期限を編集", async () => {
       await editDeadline(page);
     });
 
-    await evidenceStep(page, testInfo, "締切を完了・復元して削除", async () => {
+    await evidenceStep(page, testInfo, "ES締切を完了・復元して削除", async () => {
       await completeRestoreAndDeleteDeadline(page);
     });
   });
