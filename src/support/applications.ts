@@ -1,0 +1,40 @@
+import { expect, type Page } from "@playwright/test";
+import { testJob } from "../fixtures/job.js";
+import { assertMutationAllowed } from "./env.js";
+
+export async function applyToCurrentJob(page: Page): Promise<void> {
+  assertMutationAllowed();
+  await page.getByRole("button", { name: "応募する" }).click();
+  await expect(page).toHaveURL(/\/app\/applications\/[^/?#]+/);
+  await expect(page.getByRole("heading", { name: testJob.companyName })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "現在の状況" })).toBeVisible();
+}
+
+export async function updateApplicationToInterview(page: Page): Promise<void> {
+  assertMutationAllowed();
+  await page.getByLabel("ステータス変更（任意）").selectOption("interview");
+  await page.getByLabel("現在の段階（任意）").fill("一次面接");
+  await page.getByLabel("次のアクション").fill("想定質問を確認して面接準備を行う");
+  await page.getByLabel("メモ").fill("E2E synthetic application: 面接フェーズへ更新");
+  await page.getByRole("button", { name: "更新する" }).click();
+  await expect(page.getByRole("status")).toContainText("更新しました。");
+  await expect(page.getByText(/面接/).first()).toBeVisible();
+  await expect(page.getByText(/一次面接/).first()).toBeVisible();
+}
+
+export async function verifyApplicationTimeline(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { name: "選考履歴" })).toBeVisible();
+  await expect(page.getByText(/作成: 保存済み/)).toBeVisible();
+  await expect(page.getByText(/保存済み → 面接/)).toBeVisible();
+}
+
+export async function verifyInterviewFilter(page: Page): Promise<void> {
+  await page.goto("/app/applications?status=interview");
+  await expect(
+    page.getByRole("link", { name: new RegExp(testJob.companyName) }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "面接", exact: true })).toHaveAttribute(
+    "data-active",
+    "true",
+  );
+}
