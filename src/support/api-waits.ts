@@ -3,6 +3,7 @@ import type { Page, Response } from "@playwright/test";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 const MAX_ERROR_BODY_CHARS = 2_000;
+const DEFAULT_API_TIMEOUT_MS = 20_000;
 
 type ResponseMatcher = (response: Response) => boolean;
 
@@ -37,15 +38,29 @@ export async function requireSuccessfulResponse(
   );
 }
 
+export async function runAndRequireResponse(
+  page: Page,
+  matcher: ResponseMatcher,
+  operation: string,
+  action: () => Promise<void>,
+  timeout = DEFAULT_API_TIMEOUT_MS,
+): Promise<Response> {
+  const responsePromise = page.waitForResponse(matcher, { timeout });
+  await action();
+  return requireSuccessfulResponse(await responsePromise, operation);
+}
+
 export async function runAndRequireAiResponse(
   page: Page,
   matcher: ResponseMatcher,
   operation: string,
   action: () => Promise<void>,
 ): Promise<Response> {
-  const responsePromise = page.waitForResponse(matcher, {
-    timeout: AI_RESULT_TIMEOUT,
-  });
-  await action();
-  return requireSuccessfulResponse(await responsePromise, operation);
+  return runAndRequireResponse(
+    page,
+    matcher,
+    operation,
+    action,
+    AI_RESULT_TIMEOUT,
+  );
 }
