@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { assertMutationAllowed } from "./env.js";
 
 export const deadlineTitle = "E2E ES提出";
+export const interviewDeadlineTitle = "E2E 一次面接";
 export const updatedDeadlineTitle = "E2E ES提出（更新）";
 
 function tokyoDateTimeLocal(hoursFromNow: number): string {
@@ -37,6 +38,16 @@ export async function createDeadlineForCurrentApplication(page: Page): Promise<v
   await expect(row(page, deadlineTitle)).toBeVisible();
 }
 
+export async function createInterviewDeadlineForCurrentApplication(page: Page): Promise<void> {
+  assertMutationAllowed();
+  await expect(page).toHaveURL(/\/app\/deadlines/);
+  await page.getByLabel("種別").selectOption("interview");
+  await page.getByLabel("タイトル").fill(interviewDeadlineTitle);
+  await page.getByLabel(/期限（Asia\/Tokyoの現地時刻）/).fill(tokyoDateTimeLocal(96));
+  await page.getByRole("button", { name: "締切を登録" }).click();
+  await expect(row(page, interviewDeadlineTitle)).toBeVisible();
+}
+
 export async function verifyDeadlineInApplicationAndDashboard(page: Page): Promise<void> {
   const deadlineRow = row(page, deadlineTitle);
   await deadlineRow.getByRole("link", { name: "応募を見る" }).click();
@@ -46,6 +57,19 @@ export async function verifyDeadlineInApplicationAndDashboard(page: Page): Promi
   await page.goto("/app");
   await expect(page.getByRole("heading", { name: "直近の締切" })).toBeVisible();
   await expect(page.getByText(deadlineTitle, { exact: false })).toBeVisible();
+}
+
+export async function verifyBothDeadlinesInApplicationAndDashboard(page: Page): Promise<void> {
+  const interviewRow = row(page, interviewDeadlineTitle);
+  await interviewRow.getByRole("link", { name: "応募を見る" }).click();
+  const deadlineSection = page.getByRole("heading", { name: "締切" }).locator("..");
+  await expect(deadlineSection).toContainText(deadlineTitle);
+  await expect(deadlineSection).toContainText(interviewDeadlineTitle);
+
+  await page.goto("/app");
+  const dashboardDeadlines = page.getByRole("heading", { name: "直近の締切" }).locator("..");
+  await expect(dashboardDeadlines).toContainText(deadlineTitle);
+  await expect(dashboardDeadlines).toContainText(interviewDeadlineTitle);
 }
 
 export async function editDeadline(page: Page): Promise<void> {
