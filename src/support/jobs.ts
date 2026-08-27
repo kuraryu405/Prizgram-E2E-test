@@ -1,7 +1,11 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Response } from "@playwright/test";
 import { testJob, updatedTestJobBody } from "../fixtures/job.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
+
+const CLOUDFLARE_SCORE_RETRY_LIMIT = 3;
+const ORIGIN_HEALTH_POLL_MS = 5_000;
+const ORIGIN_HEALTH_TIMEOUT_MS = 120_000;
 
 export async function importSyntheticJob(page: Page): Promise<void> {
   assertMutationAllowed();
@@ -22,29 +26,83 @@ export async function openSyntheticJob(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: testJob.companyName })).toBeVisible();
 }
 
+function isScoreResponse(response: Response): boolean {
+  if (response.request().method() !== "POST") return false;
+  try {
+    return /\/api\/jobs\/[^/]+\/score$/.test(new URL(response.url()).pathname);
+  } catch {
+    return false;
+  }
+}
+
+async function isCloudflareHostFailure(response: Response, body: string): Promise<boolean> {
+  if (response.status() !== 502) return false;
+  const contentType = (await response.headerValue("content-type")) ?? "";
+  return (
+    contentType.toLowerCase().includes("text/html") &&
+    /cloudflare/i.test(body) &&
+    /bad gateway|host\s+error|cf-error-source/i.test(body)
+  );
+}
+
+async function waitForOriginHealth(page: Page): Promise<void> {
+  const deadline = Date.now() + ORIGIN_HEALTH_TIMEOUT_MS;
+  let lastStatus = "unreachable";
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await page.request.get("/api/health", {
+        failOnStatusCode: false,
+        timeout: 10_000,
+      });
+      lastStatus = `HTTP ${response.status()}`;
+      if (response.ok()) return;
+    } catch (error) {
+      lastStatus = error instanceof Error ? error.message : String(error);
+    }
+    await page.waitForTimeout(ORIGIN_HEALTH_POLL_MS);
+  }
+
+  throw new Error(
+    `Prizgram origin did not recover within ${ORIGIN_HEALTH_TIMEOUT_MS / 1000}s after a Cloudflare 502 (last health result: ${lastStatus}).`,
+  );
+}
+
+async function requestCurrentJobScore(page: Page): Promise<Response> {
+  const scoreResponsePromise = page.waitForResponse(isScoreResponse, {
+    timeout: AI_RESULT_TIMEOUT,
+  });
+  await page.getByRole("button", { name: "この求人を評価する" }).click();
+  return scoreResponsePromise;
+}
+
 export async function evaluateCurrentJob(page: Page): Promise<void> {
   assertMutationAllowed();
 
-  const scoreResponsePromise = page.waitForResponse(
-    (response) => {
-      if (response.request().method() !== "POST") return false;
-      try {
-        return /\/api\/jobs\/[^/]+\/score$/.test(new URL(response.url()).pathname);
-      } catch {
-        return false;
-      }
-    },
-    { timeout: AI_RESULT_TIMEOUT },
-  );
+  let scoreResponse: Response | undefined;
+  for (let attempt = 1; attempt <= CLOUDFLARE_SCORE_RETRY_LIMIT; attempt += 1) {
+    scoreResponse = await requestCurrentJobScore(page);
+    if (scoreResponse.ok()) break;
 
-  await page.getByRole("button", { name: "この求人を評価する" }).click();
-  const scoreResponse = await scoreResponsePromise;
-
-  if (!scoreResponse.ok()) {
     const body = await scoreResponse.text().catch(() => "<response body unavailable>");
-    throw new Error(
-      `Job scoring failed: HTTP ${scoreResponse.status()} ${scoreResponse.statusText()}\n${body}`,
-    );
+    if (!(await isCloudflareHostFailure(scoreResponse, body))) {
+      throw new Error(
+        `Job scoring failed: HTTP ${scoreResponse.status()} ${scoreResponse.statusText()}\n${body}`,
+      );
+    }
+
+    if (attempt === CLOUDFLARE_SCORE_RETRY_LIMIT) {
+      throw new Error(
+        `Job scoring failed after ${CLOUDFLARE_SCORE_RETRY_LIMIT} attempts because Cloudflare repeatedly reported a 502 Host Error for the Prizgram origin.`,
+      );
+    }
+
+    await waitForOriginHealth(page);
+    await expect(page.getByRole("button", { name: "この求人を評価する" })).toBeEnabled();
+  }
+
+  if (scoreResponse === undefined || !scoreResponse.ok()) {
+    throw new Error("Job scoring did not produce a successful response.");
   }
 
   const scoreSection = page.getByRole("region", { name: "3軸評価" });
