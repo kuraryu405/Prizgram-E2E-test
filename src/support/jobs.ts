@@ -25,13 +25,25 @@ export async function openSyntheticJob(page: Page): Promise<void> {
 export async function evaluateCurrentJob(page: Page): Promise<void> {
   assertMutationAllowed();
   await page.getByRole("button", { name: "この求人を評価する" }).click();
-  await expect(page.getByRole("heading", { name: "スキル適合" })).toBeVisible({
+  const scoreSection = page.getByRole("heading", { name: "3軸評価" }).locator("..");
+  await expect(scoreSection.getByRole("heading", { name: "スキル適合" })).toBeVisible({
     timeout: AI_RESULT_TIMEOUT,
   });
-  await expect(
-    page.getByRole("heading", { name: "文化・価値観フィット" }),
-  ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "難易度ギャップ" })).toBeVisible();
+
+  for (const axisName of [
+    "スキル適合",
+    "文化・価値観フィット",
+    "難易度ギャップ",
+  ] as const) {
+    const axis = scoreSection.getByRole("heading", { name: axisName }).locator("..");
+    await expect(axis.locator(".axis-score")).toContainText(/\d+\s*\/\s*100/);
+    await expect(axis).toContainText("根拠:");
+    await expect(axis.locator("ul").nth(0).getByRole("listitem").first()).toBeVisible();
+    const evidence = axis.locator("ul").nth(1).getByRole("listitem").first();
+    await expect(evidence).toBeVisible();
+    await expect(evidence.locator(".signal-id")).toBeVisible();
+  }
+  await expect(scoreSection).toContainText(/persona\s+[a-zA-Z0-9]+/);
 }
 
 export async function addSyntheticJobVersion(page: Page): Promise<void> {
