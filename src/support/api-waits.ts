@@ -4,6 +4,8 @@ import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 const MAX_ERROR_BODY_CHARS = 2_000;
 const DEFAULT_API_TIMEOUT_MS = 20_000;
+const RETRYABLE_AI_CLOUDFLARE_LIMIT = 3;
+const RETRYABLE_AI_CLOUDFLARE_DELAY_MS = 1_500;
 
 type ResponseMatcher = (response: Response) => boolean;
 
@@ -25,6 +27,36 @@ async function responseBodyForError(response: Response): Promise<string> {
   const body = await response.text().catch(() => "<response body unavailable>");
   if (body.length <= MAX_ERROR_BODY_CHARS) return body;
   return `${body.slice(0, MAX_ERROR_BODY_CHARS)}\n…<truncated>`;
+}
+
+async function responseDiagnostics(response: Response): Promise<string> {
+  const names = [
+    "content-type",
+    "server",
+    "cf-ray",
+    "cf-error-type",
+    "cf-error-origin",
+  ] as const;
+  const values = await Promise.all(
+    names.map(async (name) => [name, await response.headerValue(name)] as const),
+  );
+  const present = values.filter((entry): entry is readonly [string, string] => entry[1] !== null);
+  return present.length === 0
+    ? "diagnostic headers: <none>"
+    : `diagnostic headers: ${present.map(([name, value]) => `${name}=${value}`).join(", ")}`;
+}
+
+async function isCloudflareHtml502(
+  response: Response,
+  body: string,
+): Promise<boolean> {
+  if (response.status() !== 502) return false;
+  const contentType = (await response.headerValue("content-type")) ?? "";
+  return (
+    contentType.toLowerCase().includes("text/html") &&
+    /cloudflare|cf-error-details|cf-wrapper/i.test(body) &&
+    /bad gateway|host\s+error|error code 502/i.test(body)
+  );
 }
 
 export async function requireSuccessfulResponse(
@@ -71,4 +103,52 @@ export async function runAndRequireAiResponse(
     action,
     AI_RESULT_TIMEOUT,
   );
+}
+
+/**
+ * Retries only Cloudflare-generated HTML 502 responses for AI operations that
+ * are safe to repeat (pure generation with no persisted mutation). App JSON
+ * errors, schema failures, and every other status still fail immediately.
+ */
+export async function runAndRequireRetryableAiResponse(
+  page: Page,
+  matcher: ResponseMatcher,
+  operation: string,
+  action: () => Promise<void>,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= RETRYABLE_AI_CLOUDFLARE_LIMIT; attempt += 1) {
+    const responsePromise = page.waitForResponse(matcher, {
+      timeout: AI_RESULT_TIMEOUT,
+    });
+    try {
+      await action();
+    } catch (error) {
+      void responsePromise.catch(() => undefined);
+      throw error;
+    }
+
+    const response = await responsePromise;
+    if (response.ok()) return response;
+
+    const body = await responseBodyForError(response);
+    if (!(await isCloudflareHtml502(response, body))) {
+      throw new Error(
+        `${operation} failed: HTTP ${response.status()} ${response.statusText()}\n${body}`,
+      );
+    }
+
+    if (attempt === RETRYABLE_AI_CLOUDFLARE_LIMIT) {
+      const diagnostics = await responseDiagnostics(response);
+      throw new Error(
+        `${operation} failed after ${RETRYABLE_AI_CLOUDFLARE_LIMIT} attempts because Cloudflare repeatedly returned an HTML 502 Bad Gateway.\n${diagnostics}\n${body}`,
+      );
+    }
+
+    // Let the client component leave its loading/error state before clicking
+    // the same safe generation action again. Playwright click actionability
+    // will additionally wait for the button to become enabled.
+    await page.waitForTimeout(RETRYABLE_AI_CLOUDFLARE_DELAY_MS);
+  }
+
+  throw new Error(`${operation} did not produce a response.`);
 }
