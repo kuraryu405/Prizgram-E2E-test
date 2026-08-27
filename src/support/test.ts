@@ -29,7 +29,7 @@ function classifyUrl(rawUrl: string | undefined): DiagnosticEntry["classificatio
 }
 
 export const test = base.extend<E2EFixtures>({
-  syntheticAccount: async (_fixtures, use, testInfo) => {
+  syntheticAccount: async ({}, use, testInfo) => {
     await use(newTestAccount(testInfo.title));
   },
 
