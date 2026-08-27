@@ -77,8 +77,31 @@ async function updateApplication(
   await form.getByLabel("現在の段階（任意）", { exact: true }).fill(input.stage);
   await form.getByLabel("次のアクション", { exact: true }).fill(input.nextAction);
   await form.getByLabel("メモ", { exact: true }).fill(input.note);
+
+  const updateResponsePromise = page.waitForResponse(
+    (response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "PATCH" &&
+        /\/api\/applications\/[^/?#]+$/.test(url.pathname)
+      );
+    },
+    { timeout: 30_000 },
+  );
+
   await form.getByRole("button", { name: "更新する", exact: true }).click();
-  await expect(form.getByRole("status")).toContainText("更新しました。");
+  const updateResponse = await updateResponsePromise;
+
+  if (!updateResponse.ok()) {
+    const body = await updateResponse.text().catch(() => "<unreadable body>");
+    throw new Error(
+      `Application update failed: HTTP ${updateResponse.status()}\n${body}`,
+    );
+  }
+
+  // The form calls router.refresh() immediately after setting its transient
+  // success message. That refresh may remount the form before Playwright can
+  // observe role=status, so verify the persisted application state instead.
   const overview = page.getByRole("heading", { name: "現在の状況" }).locator("..");
   await expect(overview).toContainText(input.expectedStatusText);
   await expect(overview).toContainText(input.stage);
