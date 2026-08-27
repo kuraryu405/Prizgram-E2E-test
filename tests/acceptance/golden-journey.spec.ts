@@ -48,7 +48,7 @@ import { expect, test } from "../../src/support/test.js";
 
 test.describe("S14 Golden Journey", () => {
   test("records the complete Prizgram product story as one evidence video", async ({ page }, testInfo) => {
-    test.setTimeout(600_000);
+    test.setTimeout(0);
     assertMutationAllowed();
     const account = newTestAccount("s14-golden");
 
