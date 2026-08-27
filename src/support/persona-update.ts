@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Response } from "@playwright/test";
 import { testJob } from "../fixtures/job.js";
 import {
   apiResponseMatcher,
@@ -11,8 +11,34 @@ import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 export const personaUpdateReflection =
   "面接では、実装速度だけでなくチームでIssueを分割しレビューしやすくした経験を評価された。今後はフロントエンドに限定せずWeb開発全体の経験を伸ばしたい。";
 
+const MAX_REEVALUATION_BATCHES = 20;
+
+type ReevaluationPayload = Readonly<{
+  audit: ReadonlyArray<
+    | { jobId: string; status: "scored"; scoreId: string }
+    | { jobId: string; status: "failed"; code: string }
+  >;
+  remainingJobs: number;
+}>;
+
 function personaHistory(page: Page) {
   return page.getByRole("heading", { name: "バージョン履歴" }).locator("..");
+}
+
+async function requireSuccessfulReevaluation(response: Response): Promise<number> {
+  const payload = (await response.json()) as ReevaluationPayload;
+  const failures = payload.audit.filter(
+    (entry): entry is Extract<ReevaluationPayload["audit"][number], { status: "failed" }> =>
+      entry.status === "failed",
+  );
+  if (failures.length > 0) {
+    throw new Error(
+      `Persona job re-evaluation reported per-job failure(s): ${failures
+        .map((entry) => `${entry.jobId}:${entry.code}`)
+        .join(", ")}`,
+    );
+  }
+  return payload.remainingJobs;
 }
 
 export async function proposePersonaUpdate(page: Page): Promise<void> {
@@ -78,16 +104,21 @@ export async function approvePersonaUpdateAndFinishReevaluation(page: Page): Pro
     await approveResponsePromise,
     "Persona update approval",
   );
-  await requireSuccessfulResponse(
+  const firstReevaluation = await requireSuccessfulResponse(
     await reevaluateResponsePromise,
     "Persona job re-evaluation",
   );
+  let remainingJobs = await requireSuccessfulReevaluation(firstReevaluation);
   await expect(page.getByRole("heading", { name: "再評価結果" })).toBeVisible();
 
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (
+    let batch = 0;
+    remainingJobs > 0 && batch < MAX_REEVALUATION_BATCHES;
+    batch += 1
+  ) {
     const continueButton = page.getByRole("button", { name: /残り\d+件を再評価/ });
-    if (!(await continueButton.isVisible().catch(() => false))) break;
-    await runAndRequireAiResponse(
+    await expect(continueButton).toBeVisible();
+    const response = await runAndRequireAiResponse(
       page,
       apiResponseMatcher("POST", /^\/api\/persona\/update\/re-evaluate$/),
       "Persona job re-evaluation continuation",
@@ -95,7 +126,14 @@ export async function approvePersonaUpdateAndFinishReevaluation(page: Page): Pro
         await continueButton.click();
       },
     );
+    remainingJobs = await requireSuccessfulReevaluation(response);
     await expect(page.getByRole("heading", { name: "再評価結果" })).toBeVisible();
+  }
+
+  if (remainingJobs > 0) {
+    throw new Error(
+      `Persona job re-evaluation still has ${remainingJobs} pending job(s) after ${MAX_REEVALUATION_BATCHES} batches.`,
+    );
   }
   await expect(page.getByText("全ての求人の再評価が完了しました。")).toBeVisible();
 }
