@@ -1,5 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 import { assertMutationAllowed } from "./env.js";
+import { AI_RESULT_TIMEOUT } from "./timeouts.js";
+
+async function waitForDiscoverySettled(page: Page): Promise<void> {
+  const firstCandidate = page.getByRole("article").first();
+  const empty = page.getByText("条件に一致する候補がありませんでした", {
+    exact: false,
+  });
+  await Promise.race([
+    firstCandidate.waitFor({ state: "visible", timeout: AI_RESULT_TIMEOUT }),
+    empty.waitFor({ state: "visible", timeout: AI_RESULT_TIMEOUT }),
+  ]);
+}
 
 export async function verifyDiscoveryFiltersReset(page: Page): Promise<void> {
   await page.goto("/app/jobs");
@@ -15,15 +27,13 @@ export async function verifyDiscoveryFiltersReset(page: Page): Promise<void> {
 export async function discoverJobs(page: Page): Promise<number> {
   assertMutationAllowed();
   await page.getByRole("button", { name: "求人を探す" }).click();
-
-  const first = page.getByRole("article").first();
-  await first.waitFor({ state: "visible", timeout: 30_000 }).catch(() => undefined);
+  await waitForDiscoverySettled(page);
   let count = await page.getByRole("article").count();
 
   if (count === 0) {
     await page.getByLabel("キーワード（任意）").fill("software engineer");
     await page.getByRole("button", { name: "求人を探す" }).click();
-    await first.waitFor({ state: "visible", timeout: 30_000 }).catch(() => undefined);
+    await waitForDiscoverySettled(page);
     count = await page.getByRole("article").count();
   }
 
@@ -41,11 +51,13 @@ export async function importAndEvaluateFirstCandidate(page: Page): Promise<void>
   const candidate = page.getByRole("article").first();
   await expect(candidate).toBeVisible();
   await candidate.getByRole("button", { name: "取り込む" }).click();
-  await expect(candidate.getByRole("button", { name: "取り込み済み" })).toBeDisabled();
+  await expect(candidate.getByRole("button", { name: "取り込み済み" })).toBeDisabled({
+    timeout: AI_RESULT_TIMEOUT,
+  });
 
   await candidate.getByRole("button", { name: "3軸で評価" }).click();
   await expect(candidate.getByRole("group", { name: "3軸評価結果" })).toBeVisible({
-    timeout: 60_000,
+    timeout: AI_RESULT_TIMEOUT,
   });
   await expect(candidate).toContainText("スキル適合");
   await expect(candidate).toContainText("文化・価値観");
@@ -74,7 +86,7 @@ export async function bulkImportRemainingCandidates(page: Page): Promise<void> {
     name: new RegExp(`選択した${enabledCount}件を取り込む`),
   });
   await bulkButton.click();
-  await expect(page.getByText(new RegExp(`${enabledCount}件を取り込みました|${enabledCount}件中`))).toBeVisible({
-    timeout: 60_000,
-  });
+  await expect(
+    page.getByText(new RegExp(`${enabledCount}件を取り込みました|${enabledCount}件中`)),
+  ).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
 }
