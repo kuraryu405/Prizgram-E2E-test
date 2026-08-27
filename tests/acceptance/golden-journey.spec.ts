@@ -124,7 +124,7 @@ test.describe("S14 Golden Journey", () => {
       await logout(page);
       await loginSuccessfully(page, account.loginId, account.password);
       await page.goto("/app/persona");
-      await expect(page.getByText(/v2/)).toBeVisible();
+      await expect(page.locator(".page-lead")).toContainText("バージョン2");
       await page.goto("/app/applications?status=rejected");
       await expect(
         page.getByRole("link", { name: new RegExp(testJob.companyName) }),
