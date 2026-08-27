@@ -2,7 +2,6 @@ import { expect, type Page } from "@playwright/test";
 import { personaAnswers } from "../fixtures/persona.js";
 import { apiResponseMatcher, runAndRequireAiResponse } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
-import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 const personaSteps = [
   ["スキル", personaAnswers.skills],
@@ -44,12 +43,10 @@ export async function createPersonaFromFixture(page: Page): Promise<void> {
     }
   }
 
-  await expect(page).toHaveURL(/\/app\/persona(?:$|[/?#])/, {
-    timeout: AI_RESULT_TIMEOUT,
-  });
-  await expect(page.getByRole("heading", { name: "ペルソナ" })).toBeVisible({
-    timeout: AI_RESULT_TIMEOUT,
-  });
+  // Once the AI response has completed successfully, UI reconciliation should
+  // be quick and therefore uses the normal finite Playwright expect timeout.
+  await expect(page).toHaveURL(/\/app\/persona(?:$|[/?#])/);
+  await expect(page.getByRole("heading", { name: "ペルソナ" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "スキル" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "経験" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "強み" })).toBeVisible();
