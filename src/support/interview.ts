@@ -1,8 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import {
   apiResponseMatcher,
-  runAndRequireAiResponse,
   runAndRequireResponse,
+  runAndRequireRetryableAiResponse,
 } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 
@@ -25,7 +25,7 @@ export async function generateInterviewQuestions(page: Page): Promise<void> {
   assertMutationAllowed();
   const card = interviewCard(page);
   await card.getByLabel("現在の選考段階").fill("一次面接");
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher(
       "POST",
@@ -53,7 +53,7 @@ export async function generateInterviewQuestions(page: Page): Promise<void> {
 export async function generateInterviewOutlineAndFollowup(page: Page): Promise<void> {
   assertMutationAllowed();
   const card = interviewCard(page);
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher(
       "POST",
@@ -72,7 +72,7 @@ export async function generateInterviewOutlineAndFollowup(page: Page): Promise<v
   await expect(outlineBox).toBeVisible();
   await expect(outlineBox.getByRole("listitem").first()).toBeVisible();
 
-  await runAndRequireAiResponse(
+  await runAndRequireRetryableAiResponse(
     page,
     apiResponseMatcher(
       "POST",
