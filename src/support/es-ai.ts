@@ -1,5 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { apiResponseMatcher, runAndRequireAiResponse } from "./api-waits.js";
+import {
+  apiResponseMatcher,
+  requireSuccessfulResponse,
+  runAndRequireAiResponse,
+  runAndRequireResponse,
+} from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 
 export const aiDocumentTitle = "E2E AI ES";
@@ -11,13 +16,22 @@ function aiSection(page: Page): Locator {
 }
 
 function aiDocumentCard(page: Page): Locator {
-  return page.getByRole("heading", { name: aiDocumentTitle, exact: true }).locator("..").locator("..");
+  return page
+    .locator("ul.document-list > li.card")
+    .filter({ has: page.getByRole("heading", { name: aiDocumentTitle, exact: true }) });
 }
 
 export async function createAiDocument(page: Page): Promise<void> {
   assertMutationAllowed();
   await page.getByLabel("新しい書類").fill(aiDocumentTitle);
-  await page.getByRole("button", { name: "書類を追加" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/applications\/[^/]+\/documents$/),
+    "AI document creation",
+    async () => {
+      await page.getByRole("button", { name: "書類を追加" }).click();
+    },
+  );
   await expect(page.getByRole("heading", { name: aiDocumentTitle })).toBeVisible();
 }
 
@@ -71,7 +85,14 @@ export async function saveAiDraftAndRevise(page: Page, expectedDraft: string): P
   assertMutationAllowed();
   const section = aiSection(page);
   await section.getByLabel("保存先の書類").selectOption({ label: aiDocumentTitle });
-  await section.getByRole("button", { name: "この内容で保存（AI生成）" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/documents\/[^/]+\/entries$/),
+    "AI draft save",
+    async () => {
+      await section.getByRole("button", { name: "この内容で保存（AI生成）" }).click();
+    },
+  );
 
   let card = aiDocumentCard(page);
   let entry = card.getByLabel(new RegExp("学生時代に最も力を入れたこと"));
@@ -82,7 +103,11 @@ export async function saveAiDraftAndRevise(page: Page, expectedDraft: string): P
   const userEdited = `${expectedDraft.slice(0, 350).trim()} 保存後にもユーザーが編集しました。`;
   expect(userEdited.length).toBeLessThanOrEqual(aiCharacterLimit);
   await entry.fill(userEdited);
+  const updateResponsePromise = page.waitForResponse(
+    apiResponseMatcher("PATCH", /^\/api\/entries\/[^/]+$/),
+  );
   await entry.blur();
+  await requireSuccessfulResponse(await updateResponsePromise, "AI draft user edit");
 
   card = aiDocumentCard(page);
   entry = card.getByLabel(new RegExp("学生時代に最も力を入れたこと"));
