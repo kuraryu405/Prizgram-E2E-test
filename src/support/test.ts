@@ -1,5 +1,6 @@
 import { test as base, expect } from "@playwright/test";
 
+import { newTestAccount, type TestAccount } from "./account.js";
 import { getBaseUrl } from "./env.js";
 
 type DiagnosticEntry = Readonly<{
@@ -10,6 +11,11 @@ type DiagnosticEntry = Readonly<{
   method?: string;
   classification: "target" | "third_party" | "browser";
 }>;
+
+type E2EFixtures = {
+  diagnostics: void;
+  syntheticAccount: TestAccount;
+};
 
 function classifyUrl(rawUrl: string | undefined): DiagnosticEntry["classification"] {
   if (rawUrl === undefined || rawUrl === "") return "browser";
@@ -22,7 +28,12 @@ function classifyUrl(rawUrl: string | undefined): DiagnosticEntry["classificatio
   }
 }
 
-export const test = base.extend<{ diagnostics: void }>({
+export const test = base.extend<E2EFixtures>({
+  syntheticAccount: async ({}, use, testInfo) => {
+    const scenario = testInfo.titlePath.join("-");
+    await use(newTestAccount(scenario));
+  },
+
   diagnostics: [
     async ({ page }, use, testInfo) => {
       const entries: DiagnosticEntry[] = [];
