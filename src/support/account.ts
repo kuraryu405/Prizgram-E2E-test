@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { expect, type Page } from "@playwright/test";
 import { assertMutationAllowed } from "./env.js";
 
@@ -12,12 +14,12 @@ function safeToken(value: string): string {
 }
 
 export function newTestAccount(scenario: string): TestAccount {
-  const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const runId = randomUUID().replaceAll("-", "").slice(0, 16);
   const prefix = safeToken(scenario) || "scenario";
   return {
-    loginId: `e2e-${prefix}-${suffix}`.slice(0, 64),
-    password: `E2E-${suffix}-Initial!23`,
-    nextPassword: `E2E-${suffix}-Changed!45`,
+    loginId: `e2e-${prefix}-${runId}`.slice(0, 64),
+    password: `E2E-${runId}-Initial!23`,
+    nextPassword: `E2E-${runId}-Changed!45`,
   };
 }
 
