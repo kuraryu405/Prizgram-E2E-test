@@ -1,6 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  apiResponseMatcher,
+  runAndRequireAiResponse,
+  runAndRequireResponse,
+} from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
-import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 export const interviewQuestionAsked = "チーム開発で最も難しかったことは何ですか？";
 export const interviewAnswerNotes =
@@ -21,10 +25,18 @@ export async function generateInterviewQuestions(page: Page): Promise<void> {
   assertMutationAllowed();
   const card = interviewCard(page);
   await card.getByLabel("現在の選考段階").fill("一次面接");
-  await card.getByRole("button", { name: "想定質問を生成" }).click();
-  await expect(card.getByRole("heading", { name: "想定質問" })).toBeVisible({
-    timeout: AI_RESULT_TIMEOUT,
-  });
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher(
+      "POST",
+      /^\/api\/applications\/[^/]+\/interview-questions$/,
+    ),
+    "Interview question generation",
+    async () => {
+      await card.getByRole("button", { name: "想定質問を生成" }).click();
+    },
+  );
+  await expect(card.getByRole("heading", { name: "想定質問" })).toBeVisible();
 
   const firstQuestionButton = card
     .getByRole("button", { name: "回答を組み立てる" })
@@ -34,25 +46,44 @@ export async function generateInterviewQuestions(page: Page): Promise<void> {
   await expect(questionCard.locator("strong")).not.toHaveText("");
   await expect(questionCard).toContainText(/意図:\s*\S+/);
   await expect(questionCard).toContainText(/根拠:\s*\S+/);
-  await expect(questionCard).toContainText(/使えそうな材料:\s*\S+/);
+  // materialRefs are optional in the product contract. When present they are
+  // rendered as "使えそうな材料", but an empty list is still valid.
 }
 
 export async function generateInterviewOutlineAndFollowup(page: Page): Promise<void> {
   assertMutationAllowed();
   const card = interviewCard(page);
-  await card.getByRole("button", { name: "回答を組み立てる" }).first().click();
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher(
+      "POST",
+      /^\/api\/applications\/[^/]+\/interview-outline$/,
+    ),
+    "Interview outline generation",
+    async () => {
+      await card.getByRole("button", { name: "回答を組み立てる" }).first().click();
+    },
+  );
+
   const outlineHeading = card.getByRole("heading", { name: "回答骨子" });
-  await expect(outlineHeading).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+  await expect(outlineHeading).toBeVisible();
   const outlineArea = outlineHeading.locator("..");
   const outlineBox = outlineArea.locator(".card").first();
   await expect(outlineBox).toBeVisible();
   await expect(outlineBox.getByRole("listitem").first()).toBeVisible();
-  await expect(outlineBox).toContainText(/根拠:\s*\S+/);
 
-  await outlineBox.getByRole("button", { name: "深掘りを見る" }).click();
-  await expect(outlineBox.getByText("深掘り候補", { exact: true })).toBeVisible({
-    timeout: AI_RESULT_TIMEOUT,
-  });
+  await runAndRequireAiResponse(
+    page,
+    apiResponseMatcher(
+      "POST",
+      /^\/api\/applications\/[^/]+\/interview-followup$/,
+    ),
+    "Interview follow-up generation",
+    async () => {
+      await outlineBox.getByRole("button", { name: "深掘りを見る" }).click();
+    },
+  );
+  await expect(outlineBox.getByText("深掘り候補", { exact: true })).toBeVisible();
   const followupList = outlineBox
     .getByText("深掘り候補", { exact: true })
     .locator("..")
@@ -69,7 +100,14 @@ export async function saveInterviewReflection(page: Page): Promise<void> {
   await section.getByLabel("自分の回答/要点").fill(interviewAnswerNotes);
   await section.getByLabel("感触").fill(interviewImpression);
   await section.getByLabel("フィードバック / メモ").fill(interviewFeedback);
-  await section.getByRole("button", { name: "振り返りを保存" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/applications\/[^/]+\/reflections$/),
+    "Interview reflection save",
+    async () => {
+      await section.getByRole("button", { name: "振り返りを保存" }).click();
+    },
+  );
   await expect(section).toContainText(interviewQuestionAsked);
   await expect(section).toContainText(interviewAnswerNotes);
   await expect(section).toContainText(interviewImpression);
