@@ -3,14 +3,16 @@ import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 async function waitForDiscoverySettled(page: Page): Promise<void> {
-  const firstCandidate = page.getByRole("article").first();
-  const empty = page.getByText("条件に一致する候補がありませんでした", {
-    exact: false,
-  });
-  await Promise.race([
-    firstCandidate.waitFor({ state: "visible", timeout: AI_RESULT_TIMEOUT }),
-    empty.waitFor({ state: "visible", timeout: AI_RESULT_TIMEOUT }),
-  ]);
+  const resultsHeading = page.getByRole("heading", { name: /検索結果\s+[\d,]+件/ });
+  await expect(resultsHeading).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
+}
+
+async function verifyProviderSummary(page: Page): Promise<void> {
+  const sources = page.getByRole("list", { name: "求人取得元" });
+  await expect(sources).toBeVisible();
+  for (const provider of ["Careerjet", "Himalayas", "Jobicy"] as const) {
+    await expect(sources).toContainText(provider);
+  }
 }
 
 export async function verifyDiscoveryFiltersReset(page: Page): Promise<void> {
@@ -28,16 +30,19 @@ export async function discoverJobs(page: Page): Promise<number> {
   assertMutationAllowed();
   await page.getByRole("button", { name: "求人を探す" }).click();
   await waitForDiscoverySettled(page);
+  await verifyProviderSummary(page);
   let count = await page.getByRole("article").count();
 
   if (count === 0) {
     await page.getByLabel("キーワード（任意）").fill("software engineer");
     await page.getByRole("button", { name: "求人を探す" }).click();
     await waitForDiscoverySettled(page);
+    await verifyProviderSummary(page);
     count = await page.getByRole("article").count();
   }
 
   if (count === 0) {
+    await expect(page.getByText("候補が見つかりませんでした。", { exact: true })).toBeVisible();
     test.info().annotations.push({
       type: "EXTERNAL_DEPENDENCY",
       description: "求人providerから候補を取得できなかったため、候補操作を実行しませんでした。",
@@ -60,8 +65,14 @@ export async function importAndEvaluateFirstCandidate(page: Page): Promise<void>
     timeout: AI_RESULT_TIMEOUT,
   });
   await expect(candidate).toContainText("スキル適合");
-  await expect(candidate).toContainText("文化・価値観");
-  await expect(candidate).toContainText("難易度");
+  await expect(candidate).toContainText("カルチャー適合");
+  await expect(candidate).toContainText("難易度ギャップ");
+
+  await candidate.getByRole("button", { name: "根拠を見る" }).click();
+  await expect(candidate).toContainText("根拠:");
+  const evidenceIds = candidate.locator(".candidate-score-details .signal-id");
+  await expect(evidenceIds.first()).toBeVisible();
+  await expect(candidate.getByRole("link", { name: "詳細へ" })).toBeVisible();
 }
 
 export async function bulkImportRemainingCandidates(page: Page): Promise<void> {
