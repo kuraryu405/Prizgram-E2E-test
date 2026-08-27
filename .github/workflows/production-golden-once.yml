@@ -1,0 +1,75 @@
+name: Production Golden Journey (one-shot)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/production-golden-once.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-golden-once
+  cancel-in-progress: false
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      E2E_BASE_URL: https://prizgram.kuraryu.jp
+      E2E_ALLOW_MUTATION: 'true'
+      E2E_ALLOW_PRODUCTION: 'true'
+      E2E_PRODUCTION_HOSTS: prizgram.kuraryu.jp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run production Golden Journey
+        run: pnpm test:golden
+
+      - name: Upload Golden evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-golden-evidence-${{ github.run_id }}
+          path: |
+            artifacts/test-results/**/*.mp4
+            artifacts/test-results/**/evidence/*.png
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Playwright debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-golden-debug-${{ github.run_id }}
+          path: |
+            artifacts/test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
