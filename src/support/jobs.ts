@@ -106,16 +106,23 @@ export async function evaluateCurrentJob(page: Page): Promise<void> {
   }
 
   const scoreSection = page.getByRole("region", { name: "3軸評価" });
-  await expect(scoreSection.getByRole("heading", { name: "スキル適合" })).toBeVisible({
-    timeout: AI_RESULT_TIMEOUT,
-  });
+
+  // ScoreEvaluateButton first renders the fresh result client-side, then calls
+  // router.refresh(). During that transition both the client preview and the
+  // server-rendered persisted score can briefly coexist. Assert only against
+  // .score-current so strict-mode locators never race that duplicate DOM.
+  const currentScore = scoreSection.locator(".score-current");
+  await expect(currentScore).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
 
   for (const axisName of [
     "スキル適合",
     "文化・価値観フィット",
     "難易度ギャップ",
   ] as const) {
-    const axis = scoreSection.getByRole("heading", { name: axisName }).locator("..");
+    const axis = currentScore
+      .locator("li.axis-item")
+      .filter({ has: currentScore.getByRole("heading", { name: axisName, exact: true }) });
+    await expect(axis).toHaveCount(1);
     await expect(axis.locator(".axis-score")).toContainText(/\d+\s*\/\s*100/);
     await expect(axis).toContainText("根拠:");
     await expect(axis.locator("ul").nth(0).getByRole("listitem").first()).toBeVisible();
@@ -123,7 +130,7 @@ export async function evaluateCurrentJob(page: Page): Promise<void> {
     await expect(evidence).toBeVisible();
     await expect(evidence.locator(".signal-id")).toBeVisible();
   }
-  await expect(scoreSection).toContainText(/persona\s+[a-zA-Z0-9]+/);
+  await expect(currentScore).toContainText(/persona\s+[a-zA-Z0-9]+/);
 }
 
 export async function addSyntheticJobVersion(page: Page): Promise<void> {
