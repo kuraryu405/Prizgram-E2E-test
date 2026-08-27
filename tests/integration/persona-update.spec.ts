@@ -1,6 +1,7 @@
 import { test } from "../../src/support/test.js";
 import {
   applyToCurrentJob,
+  recordRejectedSelectionResult,
   updateApplicationToInterview,
 } from "../../src/support/applications.js";
 import { newTestAccount, register } from "../../src/support/account.js";
@@ -32,6 +33,7 @@ test.describe("S10 persona feedback loop", () => {
     await applyToCurrentJob(page);
     await updateApplicationToInterview(page);
     await saveInterviewReflection(page);
+    await recordRejectedSelectionResult(page);
 
     await evidenceStep(page, testInfo, "選考結果と振り返りからPersona更新案を作成", async () => {
       await proposePersonaUpdate(page);
