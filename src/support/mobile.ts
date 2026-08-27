@@ -6,7 +6,7 @@ export const mobileViewports = [
   { width: 390, height: 844 },
 ] as const;
 
-async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   await expect
     .poll(() =>
       page.evaluate(
@@ -21,6 +21,20 @@ async function expectTapTarget(locator: Locator): Promise<void> {
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThanOrEqual(44);
   expect(box!.height).toBeGreaterThanOrEqual(44);
+}
+
+export async function expectControlAboveBottomNav(
+  page: Page,
+  control: Locator,
+): Promise<void> {
+  await control.scrollIntoViewIfNeeded();
+  await expect(control).toBeVisible();
+  const navigation = page.locator(".app-nav");
+  const controlBox = await control.boundingBox();
+  const navBox = await navigation.boundingBox();
+  expect(controlBox).not.toBeNull();
+  expect(navBox).not.toBeNull();
+  expect(controlBox!.y + controlBox!.height).toBeLessThanOrEqual(navBox!.y + 1);
 }
 
 async function expectBottomNavigation(page: Page): Promise<void> {
