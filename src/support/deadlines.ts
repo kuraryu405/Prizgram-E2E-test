@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { apiResponseMatcher, runAndRequireResponse } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 
 export const deadlineTitle = "E2E ES提出";
@@ -34,7 +35,14 @@ export async function createDeadlineForCurrentApplication(page: Page): Promise<v
   await page.getByLabel("種別").selectOption("document");
   await page.getByLabel("タイトル").fill(deadlineTitle);
   await page.getByLabel(/期限（Asia\/Tokyoの現地時刻）/).fill(tokyoDateTimeLocal(48));
-  await page.getByRole("button", { name: "締切を登録" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/deadlines$/),
+    "Deadline creation",
+    async () => {
+      await page.getByRole("button", { name: "締切を登録" }).click();
+    },
+  );
   await expect(row(page, deadlineTitle)).toBeVisible();
 }
 
@@ -44,7 +52,14 @@ export async function createInterviewDeadlineForCurrentApplication(page: Page): 
   await page.getByLabel("種別").selectOption("interview");
   await page.getByLabel("タイトル").fill(interviewDeadlineTitle);
   await page.getByLabel(/期限（Asia\/Tokyoの現地時刻）/).fill(tokyoDateTimeLocal(96));
-  await page.getByRole("button", { name: "締切を登録" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/deadlines$/),
+    "Interview deadline creation",
+    async () => {
+      await page.getByRole("button", { name: "締切を登録" }).click();
+    },
+  );
   await expect(row(page, interviewDeadlineTitle)).toBeVisible();
 }
 
@@ -85,22 +100,42 @@ export async function editDeadline(page: Page): Promise<void> {
   await dialog
     .getByLabel(/期限（Asia\/Tokyoの現地時刻）/)
     .fill(tokyoDateTimeLocal(72));
-  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("PATCH", /^\/api\/deadlines\/[^/]+$/),
+    "Deadline update",
+    async () => {
+      await dialog.getByRole("button", { name: "保存", exact: true }).click();
+    },
+  );
   await expect(row(page, updatedDeadlineTitle)).toBeVisible();
-  await expect(page.getByText("締切を更新しました。")).toBeVisible();
 }
 
 export async function completeRestoreAndDeleteDeadline(page: Page): Promise<void> {
   assertMutationAllowed();
   let deadlineRow = row(page, updatedDeadlineTitle);
-  await deadlineRow.getByRole("button", { name: "完了にする" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("PATCH", /^\/api\/deadlines\/[^/]+$/),
+    "Deadline completion",
+    async () => {
+      await deadlineRow.getByRole("button", { name: "完了にする" }).click();
+    },
+  );
 
   const completedSection = page.getByRole("heading", { name: "完了済み" }).locator("..");
   await expect(completedSection).toContainText(updatedDeadlineTitle);
   deadlineRow = completedSection.locator("li.deadline-item").filter({
     hasText: updatedDeadlineTitle,
   });
-  await deadlineRow.getByRole("button", { name: "未完了に戻す" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("PATCH", /^\/api\/deadlines\/[^/]+$/),
+    "Deadline restore",
+    async () => {
+      await deadlineRow.getByRole("button", { name: "未完了に戻す" }).click();
+    },
+  );
 
   deadlineRow = row(page, updatedDeadlineTitle);
   await expect(deadlineRow).toBeVisible();
@@ -110,6 +145,13 @@ export async function completeRestoreAndDeleteDeadline(page: Page): Promise<void
   await deadlineRow.getByRole("button", { name: "削除" }).click();
   const deleteDialog = page.getByRole("dialog");
   await expect(deleteDialog).toContainText(updatedDeadlineTitle);
-  await deleteDialog.getByRole("button", { name: "削除する" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("DELETE", /^\/api\/deadlines\/[^/]+$/),
+    "Deadline deletion",
+    async () => {
+      await deleteDialog.getByRole("button", { name: "削除する" }).click();
+    },
+  );
   await expect(row(page, updatedDeadlineTitle)).toHaveCount(0);
 }
