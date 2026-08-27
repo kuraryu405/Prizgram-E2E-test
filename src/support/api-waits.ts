@@ -40,10 +40,12 @@ async function responseDiagnostics(response: Response): Promise<string> {
   const values = await Promise.all(
     names.map(async (name) => [name, await response.headerValue(name)] as const),
   );
-  const present = values.filter((entry): entry is readonly [string, string] => entry[1] !== null);
+  const present = values.flatMap(([name, value]) =>
+    value === null ? [] : [`${name}=${value}`],
+  );
   return present.length === 0
     ? "diagnostic headers: <none>"
-    : `diagnostic headers: ${present.map(([name, value]) => `${name}=${value}`).join(", ")}`;
+    : `diagnostic headers: ${present.join(", ")}`;
 }
 
 async function isCloudflareHtml502(
@@ -116,7 +118,11 @@ export async function runAndRequireRetryableAiResponse(
   operation: string,
   action: () => Promise<void>,
 ): Promise<Response> {
-  for (let attempt = 1; attempt <= RETRYABLE_AI_CLOUDFLARE_LIMIT; attempt += 1) {
+  for (
+    let attempt = 1;
+    attempt <= RETRYABLE_AI_CLOUDFLARE_LIMIT;
+    attempt += 1
+  ) {
     const responsePromise = page.waitForResponse(matcher, {
       timeout: AI_RESULT_TIMEOUT,
     });
