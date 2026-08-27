@@ -4,6 +4,7 @@ import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
 export const aiDocumentTitle = "E2E AI ES";
 export const aiQuestion = "学生時代に最も力を入れたことを400文字以内で教えてください";
+const aiCharacterLimit = 400;
 
 function aiSection(page: Page): Locator {
   return page.getByRole("heading", { name: "ES AI支援" }).locator("..");
@@ -24,7 +25,7 @@ export async function findEsEpisodes(page: Page): Promise<void> {
   assertMutationAllowed();
   const section = aiSection(page);
   await section.getByLabel("設問").fill(aiQuestion);
-  await section.getByLabel("文字数制限").fill("400");
+  await section.getByLabel("文字数制限").fill(String(aiCharacterLimit));
   await section.getByRole("button", { name: "使えそうな経験を探す" }).click();
   const candidate = section.locator('li[role="button"]').first();
   await expect(candidate).toBeVisible({ timeout: AI_RESULT_TIMEOUT });
@@ -41,8 +42,12 @@ export async function generateAndHumanEditDraft(page: Page): Promise<string> {
   const generated = await preview.inputValue();
   expect(generated.trim().length).toBeGreaterThan(0);
   const humanEdited = `${generated.slice(0, 360).trim()} E2Eで内容を確認・編集しました。`;
+  expect(humanEdited.length).toBeLessThanOrEqual(aiCharacterLimit);
   await preview.fill(humanEdited);
   await expect(preview).toHaveValue(humanEdited);
+  await expect(section).toContainText(
+    new RegExp(`${humanEdited.length}\\s*/\\s*${aiCharacterLimit}`),
+  );
   return humanEdited;
 }
 
@@ -56,8 +61,10 @@ export async function saveAiDraftAndRevise(page: Page, expectedDraft: string): P
   let entry = card.getByLabel(new RegExp("学生時代に最も力を入れたこと"));
   await expect(entry).toHaveValue(expectedDraft);
   await expect(card).toContainText("AI生成");
+  await expect(card).toContainText(new RegExp(`/\\s*${aiCharacterLimit}文字`));
 
   const userEdited = `${expectedDraft.slice(0, 350).trim()} 保存後にもユーザーが編集しました。`;
+  expect(userEdited.length).toBeLessThanOrEqual(aiCharacterLimit);
   await entry.fill(userEdited);
   await entry.blur();
 
