@@ -1,5 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 import { testJob } from "../fixtures/job.js";
+import {
+  apiResponseMatcher,
+  runAndRequireResponse,
+} from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 
 export const minimalApplicationCompany = "E2E Direct Selection株式会社";
@@ -15,10 +19,18 @@ export async function createMinimalApplicationWithoutJob(page: Page): Promise<vo
   await form.getByLabel("現在の段階（任意）").fill("二次面接");
   await form.getByLabel("次のアクション（任意）").fill("面接準備を行う");
   await form.getByLabel("メモ（任意）").fill("E2E synthetic direct selection");
-  await form.getByRole("button", { name: "応募を追加" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/applications\/minimal$/),
+    "Minimal application creation",
+    async () => {
+      await form.getByRole("button", { name: "応募を追加" }).click();
+    },
+  );
 
+  // The creation acknowledgement includes a direct deadline shortcut. It is
+  // useful UX, but the persisted application card is the authoritative state.
   const success = form.getByRole("status");
-  await expect(success).toContainText("応募を追加しました。");
   await expect(success.getByRole("link", { name: "締切を追加" })).toBeVisible();
 
   const list = page.getByRole("heading", { name: "応募一覧" }).locator("..");
@@ -41,7 +53,14 @@ export async function createMinimalApplicationWithoutJob(page: Page): Promise<vo
 
 export async function applyToCurrentJob(page: Page): Promise<void> {
   assertMutationAllowed();
-  await page.getByRole("button", { name: "応募する" }).click();
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("POST", /^\/api\/applications$/),
+    "Job application creation",
+    async () => {
+      await page.getByRole("button", { name: "応募する" }).click();
+    },
+  );
   await expect(page).toHaveURL(/\/app\/applications\/[^/?#]+/);
   await expect(page.getByRole("heading", { name: testJob.companyName })).toBeVisible();
   await expect(page.getByRole("heading", { name: "現在の状況" })).toBeVisible();
@@ -78,30 +97,18 @@ async function updateApplication(
   await form.getByLabel("次のアクション", { exact: true }).fill(input.nextAction);
   await form.getByLabel("メモ", { exact: true }).fill(input.note);
 
-  const updateResponsePromise = page.waitForResponse(
-    (response) => {
-      const url = new URL(response.url());
-      return (
-        response.request().method() === "PATCH" &&
-        /\/api\/applications\/[^/?#]+$/.test(url.pathname)
-      );
+  await runAndRequireResponse(
+    page,
+    apiResponseMatcher("PATCH", /^\/api\/applications\/[^/]+$/),
+    "Application update",
+    async () => {
+      await form.getByRole("button", { name: "更新する", exact: true }).click();
     },
-    { timeout: 30_000 },
+    30_000,
   );
 
-  await form.getByRole("button", { name: "更新する", exact: true }).click();
-  const updateResponse = await updateResponsePromise;
-
-  if (!updateResponse.ok()) {
-    const body = await updateResponse.text().catch(() => "<unreadable body>");
-    throw new Error(
-      `Application update failed: HTTP ${updateResponse.status()}\n${body}`,
-    );
-  }
-
-  // The form calls router.refresh() immediately after setting its transient
-  // success message. That refresh may remount the form before Playwright can
-  // observe role=status, so verify the persisted application state instead.
+  // The form calls router.refresh() after success. Verify persisted state rather
+  // than depending on a transient role=status acknowledgement.
   const overview = page.getByRole("heading", { name: "現在の状況" }).locator("..");
   await expect(overview).toContainText(input.expectedStatusText);
   await expect(overview).toContainText(input.stage);
