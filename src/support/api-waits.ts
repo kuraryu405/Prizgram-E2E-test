@@ -46,7 +46,15 @@ export async function runAndRequireResponse(
   timeout = DEFAULT_API_TIMEOUT_MS,
 ): Promise<Response> {
   const responsePromise = page.waitForResponse(matcher, { timeout });
-  await action();
+  try {
+    await action();
+  } catch (error) {
+    // The action can fail before it issues the request (for example because a
+    // locator became ambiguous). Mark the pending waiter as handled so page
+    // teardown does not add a secondary "Channel closed" rejection.
+    void responsePromise.catch(() => undefined);
+    throw error;
+  }
   return requireSuccessfulResponse(await responsePromise, operation);
 }
 
