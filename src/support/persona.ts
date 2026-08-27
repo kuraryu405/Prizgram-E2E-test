@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { personaAnswers } from "../fixtures/persona.js";
+import { apiResponseMatcher, runAndRequireAiResponse } from "./api-waits.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
@@ -32,7 +33,14 @@ export async function createPersonaFromFixture(page: Page): Promise<void> {
     if (index < personaSteps.length - 1) {
       await page.getByRole("button", { name: "保存して次へ" }).click();
     } else {
-      await page.getByRole("button", { name: "ペルソナを生成する" }).click();
+      await runAndRequireAiResponse(
+        page,
+        apiResponseMatcher("POST", /^\/api\/persona\/generate$/),
+        "Persona generation",
+        async () => {
+          await page.getByRole("button", { name: "ペルソナを生成する" }).click();
+        },
+      );
     }
   }
 
