@@ -2,6 +2,16 @@ import { expect, test } from "../../src/support/test.js";
 import { evidenceStep } from "../../src/support/evidence.js";
 
 test.describe("public smoke", () => {
+  test("health endpoint reports database readiness", async ({ request }, testInfo) => {
+    const response = await request.get("/api/health");
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toEqual({ status: "ok" });
+    await testInfo.attach("health.json", {
+      body: Buffer.from(JSON.stringify({ status: "ok" }, null, 2)),
+      contentType: "application/json",
+    });
+  });
+
   test("landing page renders the primary Prizgram CTA", async ({ page }, testInfo) => {
     await evidenceStep(page, testInfo, "ランディングページを開く", async () => {
       await page.goto("/");
