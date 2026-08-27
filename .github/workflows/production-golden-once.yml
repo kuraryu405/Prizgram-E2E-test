@@ -1,4 +1,4 @@
-# rerun: 2026-08-28T05:00+09:00 latest-main
+# rerun: 2026-08-28T05:11+09:00 after-no-deploy-overlap-check
 name: Production Golden Journey (one-shot)
 
 on:
