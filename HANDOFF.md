@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 17:09 JST
+Updated: 2026-08-28 17:15 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `61fdd02c3205cffd7902629f2af7b8d5dd1465e0` (`feat(e2e): cut llm waits from mobile demo video`).
+- E2E code HEAD before this HANDOFF commit: `51a1c0e5f30f9f8e1faeb409cba89351120e82de` (`docs: hand off mobile llm wait cutting`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -35,12 +35,14 @@ The next mobile demo design was intentionally too narrow: it ran only Persona ge
 
 The requested recording optimization is implemented as a post-processing change: the full 14-step run still waits for and validates every LLM response, while the mobile demo timeline records those waits for removal from the final MP4. No product behavior is bypassed.
 
+The wait-cut production run completed all 14 steps successfully. The raw recording was 237.80 s; 9 LLM wait intervals totaling approximately 90.5 s were removed from the deliverable, producing a 147.36 s MP4.
+
 ## Classification
 
 - E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
-- Mobile demo phase: **LLM-wait-cut implementation committed; production rerun pending.**
+- Mobile demo phase: **Complete: full S14 step 01--14 passed with LLM wait intervals removed from the deliverable video.**
 - The gray-padding issue is **E2E-origin** (`tests/acceptance/mobile-demo.spec.ts` / `scripts/run-playwright.mjs`), not a Prizgram UI or infrastructure failure.
 - The first corrected video ended on the求人検索 screen because the test performed a redundant final verification navigation; this is also **E2E-origin** and does not indicate a Prizgram UI failure.
 - Final rerun passed with no `error-context.md`; the final frame shows Persona バージョン2.
@@ -48,13 +50,15 @@ The requested recording optimization is implemented as a post-processing change:
 - The three-scene omission is **E2E-origin** and is corrected by making the mobile demo use the same 14-step sequence as `tests/acceptance/golden-journey.spec.ts`.
 - Full mobile rerun passed: `.last-run.json` is `passed`, 14 evidence PNGs were produced, and the main portrait video is 237.80 s. The auxiliary 1.20 s recording is from the helper's temporary verification page; `video.mp4` is the demo deliverable.
 - The wait-cut change is **E2E-origin** only; there is no new Prizgram-body or infrastructure issue.
+- `.last-run.json` is `passed`; 14 evidence PNGs were produced; the cut video has no gray padding and its first cut transitions from the Persona intake completion to the generated Persona screen without UI artifacts.
 
 ## Mobile demo current step
 
-- Dedicated mobile demo scenario is implemented and complete against production for all 14 Golden Journey steps.
+- Dedicated mobile demo scenario is implemented and complete against production for all 14 Golden Journey steps, with LLM wait cutting enabled for the MP4 deliverable.
 - Target recording: 390x844 CSS px, DPR 3, portrait 1080x2340 MP4.
 - Scenes: the complete Golden Journey step 01--14 sequence, including registration, Persona, job evaluation, application, deadline, manual ES, ES AI, interview, reflection, rejection, Persona update, dashboard, and re-login persistence.
-- Evidence: `artifacts/test-results/acceptance-mobile-demo-Mob-89d84-one-portrait-evidence-video/video.mp4` — H.264, 1080x2340, 25 fps, 237.80 s; 14 step evidence images; final screen is the persisted rejected application state after re-login.
+- Evidence: `artifacts/test-results/acceptance-mobile-demo-Mob-89d84-one-portrait-evidence-video/video.mp4` — H.264, 1080x2340, 25 fps, 147.36 s; 14 step evidence images; final screen is the persisted rejected application state after re-login.
+- Raw execution remains available as `video.webm` (390x844, 237.80 s) and `mobile-demo-timeline.json` records the removed intervals.
 
 ## Fix committed in this phase
 
@@ -97,9 +101,7 @@ The requested recording optimization is implemented as a post-processing change:
 
 ## Unresolved items
 
-1. Rerun the full 14-step mobile demo against production with LLM-wait cutting enabled.
-2. Verify the cut MP4 duration, 1080x2340 dimensions, 14 evidence captures, final state, and no visible jump/UI overflow around cuts.
-3. If it fails, diagnose only the first failure and update this HANDOFF before continuing.
+- None for the requested E2E mobile demo. Full S14 execution, LLM-wait cutting, video metadata, transition spot-check, and workspace cleanliness are complete.
 
 ## Next command (再現する場合)
 
