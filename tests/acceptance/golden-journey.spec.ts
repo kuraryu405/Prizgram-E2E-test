@@ -126,13 +126,11 @@ test.describe("S14 Golden Journey", () => {
       await page.goto("/app/persona");
       await expect(page.locator(".page-lead")).toContainText("バージョン2");
       await page.goto("/app/applications?status=rejected");
-      await expect(
-        page.getByRole("link", { name: new RegExp(testJob.companyName) }),
-      ).toBeVisible();
-      await expect(page.getByRole("link", { name: "落選", exact: true })).toHaveAttribute(
-        "data-active",
-        "true",
-      );
+      const application = page
+        .getByRole("region", { name: "応募一覧" })
+        .getByRole("link", { name: new RegExp(testJob.companyName) });
+      await expect(application).toBeVisible();
+      await expect(application).toContainText("落選");
     });
   });
 });
