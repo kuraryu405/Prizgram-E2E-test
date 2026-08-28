@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 16:39 JST
+Updated: 2026-08-28 16:44 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `2a87943a8fde8a3243a3d6a2a0c37338418a4348` (`feat(e2e): add high-resolution mobile demo flow`).
+- E2E code HEAD before this HANDOFF commit: `fe01560` (`fix(e2e): fill mobile demo video frame`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -29,12 +29,15 @@ element(s) not found
 
 The application list only exposes workflow filters through `offer`; `rejected` is correctly rendered on the application card, not as a filter navigation link. The failure screenshot shows the E2E application card and its `落選` state. The corrected assertion scopes to the `応募一覧` region, checks that app's card is visible, and checks its text for `落選`.
 
+The first mobile demo run passed functionally, but visual QA found the first recording had a 1080x2340 canvas with the 390px CSS viewport left at the top-left and gray padding for the remainder. This was caused by Playwright not upscaling a smaller viewport to a larger `video.size`.
+
 ## Classification
 
 - E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
-- Mobile demo phase: **Not run yet.** There is no new failure to classify.
+- Mobile demo phase: **First run passed functionally; visual recording issue fixed, rerun pending.**
+- The gray-padding issue is **E2E-origin** (`tests/acceptance/mobile-demo.spec.ts` / `scripts/run-playwright.mjs`), not a Prizgram UI or infrastructure failure.
 
 ## Mobile demo current step
 
@@ -59,6 +62,10 @@ The application list only exposes workflow filters through `offer`; `rejected` i
   - Enables human-readable pacing for the mobile demo.
 - Commit `2a87943a8fde8a3243a3d6a2a0c37338418a4348` — `feat(e2e): add high-resolution mobile demo flow`; pushed to `origin/main`.
 - `pnpm typecheck` and `git diff --check` passed.
+- `tests/acceptance/mobile-demo.spec.ts` now records at the actual 390x844 mobile viewport.
+- `scripts/run-playwright.mjs` upscales only the mobile demo MP4 to 1080x2340 with Lanczos scaling and CRF 18.
+- Commit `fe01560` — `fix(e2e): fill mobile demo video frame`; pushed to `origin/main`.
+- `pnpm typecheck` and `git diff --check` passed.
 
 ## Prizgram issues
 
@@ -68,7 +75,7 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 
 ## Unresolved items
 
-1. Run the new mobile demo against production with mutation guards enabled.
+1. Rerun the mobile demo against production with mutation guards enabled after the recording fix.
 2. Verify MP4 dimensions, duration, final Persona v2 screen, and no mobile UI overflow.
 3. If it fails, diagnose only the first failure and update this HANDOFF before continuing.
 
@@ -89,7 +96,7 @@ pnpm test:mobile-demo
 - Cloudflare HTML 502: #301 plus timestamp-correlated `prizgram-web.service` / `cloudflared-prizgram.service` logs.
 - Step 08: deployed #306 / `apps/web/src/server/interview-ai/schemas.ts` and service.
 - Step 10--13: corresponding E2E support helpers and visible evidence screenshot.
-- Mobile demo: `tests/acceptance/mobile-demo.spec.ts`, `src/support/persona.ts`, `src/support/jobs.ts`, `src/support/applications.ts`, `src/support/persona-update.ts`.
+- Mobile demo: `tests/acceptance/mobile-demo.spec.ts`, `scripts/run-playwright.mjs`, `src/support/persona.ts`, `src/support/jobs.ts`, `src/support/applications.ts`, `src/support/persona-update.ts`.
 - Video quality: `playwright.config.ts`, `scripts/run-playwright.mjs`, then generated MP4 `ffprobe` metadata.
 
 ## Required cycle
