@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 16:57 JST
+Updated: 2026-08-28 17:03 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `fc558a76d2c56bc0bc504d7ab2d616e88b71d8eb` (`feat(e2e): run full golden journey in mobile demo`).
+- E2E code HEAD before this HANDOFF commit: `ab799d8c01e65d478476b686aef22a3f0fd23afc` (`docs: hand off full mobile golden run`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -38,18 +38,20 @@ The next mobile demo design was intentionally too narrow: it ran only Persona ge
 - E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
-- Mobile demo phase: **Full S14 step 01--14 implementation committed; production rerun pending.**
+- Mobile demo phase: **Complete: full S14 step 01--14 passed in one continuous production run.**
 - The gray-padding issue is **E2E-origin** (`tests/acceptance/mobile-demo.spec.ts` / `scripts/run-playwright.mjs`), not a Prizgram UI or infrastructure failure.
 - The first corrected video ended on the求人検索 screen because the test performed a redundant final verification navigation; this is also **E2E-origin** and does not indicate a Prizgram UI failure.
 - Final rerun passed with no `error-context.md`; the final frame shows Persona バージョン2.
 - Evidence: `artifacts/test-results/acceptance-mobile-demo-Mob-007cb-nes-as-one-continuous-story/video.mp4` — H.264, 1080x2340, 25 fps, 95.84 s.
 - The three-scene omission is **E2E-origin** and is corrected by making the mobile demo use the same 14-step sequence as `tests/acceptance/golden-journey.spec.ts`.
+- Full mobile rerun passed: `.last-run.json` is `passed`, 14 evidence PNGs were produced, and the main portrait video is 237.80 s. The auxiliary 1.20 s recording is from the helper's temporary verification page; `video.mp4` is the demo deliverable.
 
 ## Mobile demo current step
 
-- Dedicated mobile demo scenario is implemented and complete against production.
+- Dedicated mobile demo scenario is implemented and complete against production for all 14 Golden Journey steps.
 - Target recording: 390x844 CSS px, DPR 3, portrait 1080x2340 MP4.
 - Scenes: the complete Golden Journey step 01--14 sequence, including registration, Persona, job evaluation, application, deadline, manual ES, ES AI, interview, reflection, rejection, Persona update, dashboard, and re-login persistence.
+- Evidence: `artifacts/test-results/acceptance-mobile-demo-Mob-89d84-one-portrait-evidence-video/video.mp4` — H.264, 1080x2340, 25 fps, 237.80 s; 14 step evidence images; final screen is the persisted rejected application state after re-login.
 
 ## Fix committed in this phase
 
@@ -87,11 +89,9 @@ The next mobile demo design was intentionally too narrow: it ran only Persona ge
 
 ## Unresolved items
 
-1. Run the full 14-step mobile demo against production with mutation guards enabled.
-2. Verify the 14 evidence captures, MP4 duration/dimensions, final Persona v2 screen, and no mobile UI overflow.
-3. If it fails, diagnose only the first failure and update this HANDOFF before continuing.
+- None for the requested E2E mobile demo. Golden Journey and full mobile Golden Journey are complete; the workspace is clean.
 
-## Next command
+## Next command (再現する場合)
 
 ```bash
 git pull --ff-only
