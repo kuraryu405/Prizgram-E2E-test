@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 16:50 JST
+Updated: 2026-08-28 16:57 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `6dcf3c95dc0761b613c6945d8e77e8fb8741b8c0` (`docs: complete mobile demo handoff`).
+- E2E code HEAD before this HANDOFF commit: `fc558a76d2c56bc0bc504d7ab2d616e88b71d8eb` (`feat(e2e): run full golden journey in mobile demo`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -31,22 +31,25 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 
 The first mobile demo run passed functionally, but visual QA found the first recording had a 1080x2340 canvas with the 390px CSS viewport left at the top-left and gray padding for the remainder. This was caused by Playwright not upscaling a smaller viewport to a larger `video.size`.
 
+The next mobile demo design was intentionally too narrow: it ran only Persona generation, job evaluation, and Persona update instead of the desktop S14 Golden Journey's complete 14 steps. This was an E2E scenario omission, not a runtime failure.
+
 ## Classification
 
 - E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
-- Mobile demo phase: **Complete: scenes 01--03 passed in one continuous production run.**
+- Mobile demo phase: **Full S14 step 01--14 implementation committed; production rerun pending.**
 - The gray-padding issue is **E2E-origin** (`tests/acceptance/mobile-demo.spec.ts` / `scripts/run-playwright.mjs`), not a Prizgram UI or infrastructure failure.
 - The first corrected video ended on the求人検索 screen because the test performed a redundant final verification navigation; this is also **E2E-origin** and does not indicate a Prizgram UI failure.
 - Final rerun passed with no `error-context.md`; the final frame shows Persona バージョン2.
 - Evidence: `artifacts/test-results/acceptance-mobile-demo-Mob-007cb-nes-as-one-continuous-story/video.mp4` — H.264, 1080x2340, 25 fps, 95.84 s.
+- The three-scene omission is **E2E-origin** and is corrected by making the mobile demo use the same 14-step sequence as `tests/acceptance/golden-journey.spec.ts`.
 
 ## Mobile demo current step
 
 - Dedicated mobile demo scenario is implemented and complete against production.
 - Target recording: 390x844 CSS px, DPR 3, portrait 1080x2340 MP4.
-- Scenes: Persona generation, job import plus three-axis evaluation, and rejected result → Persona update plus re-evaluation.
+- Scenes: the complete Golden Journey step 01--14 sequence, including registration, Persona, job evaluation, application, deadline, manual ES, ES AI, interview, reflection, rejection, Persona update, dashboard, and re-login persistence.
 
 ## Fix committed in this phase
 
@@ -72,6 +75,9 @@ The first mobile demo run passed functionally, but visual QA found the first rec
 - `tests/acceptance/mobile-demo.spec.ts` now ends on the updated Persona v2 screen after the three demo scenes.
 - Commit `a1452ae` — `fix(e2e): end mobile demo on updated persona`; pushed to `origin/main`.
 - `pnpm typecheck` and `git diff --check` passed.
+- `tests/acceptance/mobile-demo.spec.ts` now mirrors the desktop Golden Journey's full 14-step sequence.
+- Commit `fc558a7` — `feat(e2e): run full golden journey in mobile demo`; pushed to `origin/main`.
+- `pnpm typecheck` and `git diff --check` passed.
 
 ## Prizgram issues
 
@@ -81,7 +87,9 @@ The first mobile demo run passed functionally, but visual QA found the first rec
 
 ## Unresolved items
 
-- None for the requested E2E mobile demo. Golden Journey and mobile demo are both complete; the workspace is clean.
+1. Run the full 14-step mobile demo against production with mutation guards enabled.
+2. Verify the 14 evidence captures, MP4 duration/dimensions, final Persona v2 screen, and no mobile UI overflow.
+3. If it fails, diagnose only the first failure and update this HANDOFF before continuing.
 
 ## Next command
 
@@ -100,7 +108,7 @@ pnpm test:mobile-demo
 - Cloudflare HTML 502: #301 plus timestamp-correlated `prizgram-web.service` / `cloudflared-prizgram.service` logs.
 - Step 08: deployed #306 / `apps/web/src/server/interview-ai/schemas.ts` and service.
 - Step 10--13: corresponding E2E support helpers and visible evidence screenshot.
-- Mobile demo: `tests/acceptance/mobile-demo.spec.ts`, `scripts/run-playwright.mjs`, `src/support/persona.ts`, `src/support/jobs.ts`, `src/support/applications.ts`, `src/support/persona-update.ts`.
+- Mobile demo: `tests/acceptance/mobile-demo.spec.ts`, `tests/acceptance/golden-journey.spec.ts`, `scripts/run-playwright.mjs`, and the support helpers used by steps 01--14.
 - Video quality: `playwright.config.ts`, `scripts/run-playwright.mjs`, then generated MP4 `ffprobe` metadata.
 
 ## Required cycle
