@@ -1,23 +1,24 @@
 # HANDOFF
 
-Updated: 2026-08-28 11:13 JST
+Updated: 2026-08-28 11:18 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `40d9c11bc6b8552a29118cd4e99631e3b8f1e960` (`fix(golden): assert rejected application status`).
+- E2E code HEAD before this HANDOFF commit: `ffd04f4bc115a7a1c6f8ab2a6642541d6f984c9b` (`chore: remove one-shot production Golden workflow`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
 ## Golden Journey current step
 
-- Steps **01--13 passed** in the latest continuous production run; their screenshots prove the UI through final dashboard and Persona v2 rendering.
-- First failing step: **14 ログアウト再ログイン後も状態が永続化**.
-- The logout redirect assertion was fixed and rerun reached the final rejected-application persistence assertion. Next run starts at Step 01 for one continuous evidence video.
+- **Complete: Steps 01--14 passed** in one continuous production run against deployed `c3ece3c`.
+- Step 14 confirmed logout/re-login persistence: Persona v2 and the `落選` application card remain visible.
+- Evidence: `artifacts/test-results/acceptance-golden-journey--d2a0b-story-as-one-evidence-video/video.mp4` (218.32 s), with no `error-context.md` and `.last-run.json` status `passed`.
+- UI review: final journey frames (including Persona and applications) show no layout breakage.
 
 ## Latest error summary
 
-The latest production Golden ran about four minutes against deployed `c3ece3c` and failed with:
+The previous Step 14 failure, now fixed and verified, was:
 
 ```text
 expect(locator).toHaveAttribute failed
@@ -30,7 +31,7 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 
 ## Classification
 
-- E2E-origin: **Yes.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
+- E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
 
@@ -40,6 +41,9 @@ The application list only exposes workflow filters through `offer`; `rejected` i
   - Verifies the rejected application card in `応募一覧`, rather than a nonexistent filter link.
 - Commit `40d9c11bc6b8552a29118cd4e99631e3b8f1e960` — `fix(golden): assert rejected application status`; pushed to `origin/main`.
 - `pnpm typecheck` and `git diff --check` passed.
+- `.github/workflows/production-golden-once.yml`
+  - Removed after the fully passing production run; it was a temporary one-shot workflow.
+- Commit `ffd04f4bc115a7a1c6f8ab2a6642541d6f984c9b` — `chore: remove one-shot production Golden workflow`; pushed to `origin/main`.
 
 ## Prizgram issues
 
@@ -49,16 +53,12 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 
 ## Unresolved items
 
-1. Rerun the full production Golden on E2E HEAD `40d9c11`.
-2. If all 14 steps pass, inspect the final continuous MP4/screenshots for UI regression and record final status/SHA in this HANDOFF.
-3. Remove `.github/workflows/production-golden-once.yml` only after full success.
-4. If a new failure occurs, diagnose only it, make the smallest correct E2E/Prizgram fix, typecheck, commit/push, update HANDOFF, then rerun.
+- None. Golden Journey is complete and the workspace must remain clean.
 
 ## Next command
 
 ```bash
 git pull --ff-only
-git rev-parse --short HEAD
 pnpm typecheck
 E2E_BASE_URL=https://prizgram.kuraryu.jp \
 E2E_ALLOW_MUTATION=true \
@@ -68,7 +68,7 @@ pnpm test:golden
 
 ## If the next run fails, inspect these first
 
-- Step 14: `tests/acceptance/golden-journey.spec.ts`, `apps/web/src/app/app/applications/page.tsx`, `src/support/account.ts`, then session persistence.
+- Step 14: `tests/acceptance/golden-journey.spec.ts`, `apps/web/src/app/applications/page.tsx`, `src/support/account.ts`, then session persistence.
 - Cloudflare HTML 502: #301 plus timestamp-correlated `prizgram-web.service` / `cloudflared-prizgram.service` logs.
 - Step 08: deployed #306 / `apps/web/src/server/interview-ai/schemas.ts` and service.
 - Step 10--13: corresponding E2E support helpers and visible evidence screenshot.
