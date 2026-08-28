@@ -13,6 +13,7 @@
     "test:critical": "node scripts/run-playwright.mjs tests/critical",
     "test:integration": "node scripts/run-playwright.mjs tests/integration",
     "test:mobile": "node scripts/run-playwright.mjs tests/mobile",
+    "test:mobile-demo": "node scripts/run-playwright.mjs tests/acceptance/mobile-demo.spec.ts",
     "test:golden": "node scripts/run-playwright.mjs tests/acceptance/golden-journey.spec.ts",
     "test:ui": "playwright test --ui",
     "test:headed": "node scripts/run-playwright.mjs --headed",

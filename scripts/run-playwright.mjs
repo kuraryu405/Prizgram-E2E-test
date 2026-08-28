@@ -81,14 +81,23 @@ const playwrightArgs = process.argv.slice(2);
 const goldenJourney = playwrightArgs.some((arg) =>
   arg.includes("tests/acceptance/golden-journey.spec.ts"),
 );
+const mobileDemo = playwrightArgs.some((arg) =>
+  arg.includes("tests/acceptance/mobile-demo.spec.ts"),
+);
 const childEnv = {
   ...process.env,
-  ...(goldenJourney ? { E2E_HUMAN_PACE: "true" } : {}),
+  ...(goldenJourney || mobileDemo ? { E2E_HUMAN_PACE: "true" } : {}),
 };
 
 if (goldenJourney) {
   process.stdout.write(
     "Golden Journey human-readable pacing enabled (slow actions + page showcase scrolling).\n",
+  );
+}
+
+if (mobileDemo) {
+  process.stdout.write(
+    "Mobile demo human-readable pacing enabled (portrait 1080x2340 recording).\n",
   );
 }
 
