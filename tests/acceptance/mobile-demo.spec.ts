@@ -16,9 +16,8 @@ import {
 import { createPersonaFromFixture } from "../../src/support/persona.js";
 import { expect, test as baseTest } from "../../src/support/test.js";
 
-// Keep the CSS viewport mobile-sized while recording a dense portrait frame.
-// The resulting MP4 is 1080x2340, so text remains crisp when edited into a
-// phone-first demo without changing the responsive layout under test.
+// Keep the CSS viewport mobile-sized. The runner upscales the finished portrait
+// recording to 1080x2340 so the mobile layout fills the video frame.
 baseTest.use({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 3,
@@ -26,7 +25,7 @@ baseTest.use({
   isMobile: true,
   video: {
     mode: "on",
-    size: { width: 1080, height: 2340 },
+    size: { width: 390, height: 844 },
   },
 });
 
@@ -68,4 +67,3 @@ baseTest.describe("Mobile demo — Persona / 求人評価 / Persona更新", () =
     },
   );
 });
-

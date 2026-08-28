@@ -50,6 +50,9 @@ async function convertVideos() {
   for (const webm of webmFiles) {
     const finalMp4 = webm.replace(/\.webm$/, ".mp4");
     const tempMp4 = `${finalMp4}.tmp.mp4`;
+    const mobileDemoVideoArgs = mobileDemo
+      ? ["-vf", "scale=1080:2340:flags=lanczos", "-crf", "18"]
+      : ["-crf", "23"];
     const code = await run("ffmpeg", [
       "-y",
       "-i",
@@ -58,8 +61,7 @@ async function convertVideos() {
       "libx264",
       "-preset",
       "veryfast",
-      "-crf",
-      "23",
+      ...mobileDemoVideoArgs,
       "-pix_fmt",
       "yuv420p",
       "-movflags",
@@ -97,7 +99,7 @@ if (goldenJourney) {
 
 if (mobileDemo) {
   process.stdout.write(
-    "Mobile demo human-readable pacing enabled (portrait 1080x2340 recording).\n",
+    "Mobile demo human-readable pacing enabled (390x844 mobile source, upscaled to portrait 1080x2340 MP4).\n",
   );
 }
 
