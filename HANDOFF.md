@@ -1,12 +1,12 @@
 # HANDOFF
 
-Updated: 2026-08-28 09:15 JST
+Updated: 2026-08-28 09:20 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`
 - E2E branch: `main`
-- E2E code HEAD before this HANDOFF commit: `ecadb8c11d97258fc04a6e2a60c2b9fdcb6a15d8` (`docs: update HANDOFF for Golden followup failure at step 08c`)
+- E2E code HEAD before this HANDOFF commit: `1964bdd46c10629320fffc783345a51b49b6f448` (`docs: confirm deterministic followup failure and update HANDOFF`)
 - Prizgram production main HEAD: `d1948a1083ed19d2b7c69cde9575d566f970ba85` (unchanged since 2026-08-27 19:37 UTC, no new deploy)
 - Target: `https://prizgram.kuraryu.jp` with explicit production and mutation opt-ins.
 
@@ -32,7 +32,7 @@ both failed at Step 08c after ~2m36s and ~3m18s:
 - Run 2 (2026-08-28 00:08:56 UTC, `a31f15745cf2ae80-NRT`): same message, diagnostics `content-type=text/html; charset=UTF-8, server=cloudflare, cf-ray=a31f15745cf2ae80-NRT`
 - HTTP: `502 Bad gateway`; title: `kuraryu.jp | 502: Bad gateway`; prior successes: `interview-questions` + `interview-outline`.
 - Bounded retry applies only to side-effect-free AI generation; all 3 followup attempts per run returned Cloudflare HTML representation. Edge masks origin's 502 body, so E2E cannot see application JSON directly.
-- Previous correlation for `interview-questions` at `2026-08-27 23:38:36/56/39 UTC` (`a31ee9b09c9ce3de-NRT`) proved origin logged `UPSTREAM_INVALID_RESPONSE` caused by `LlmClientError SCHEMA_VALIDATION_FAILED: The normalized content did not match its domain schema`. This followup window shows same class extended; expected origin log at `00:03:48` and `00:08:56 UTC ±30s` is `SCHEMA_VALIDATION_FAILED` for `interview-followup`. Correlation pending but 2 identical failures make infra transient unlikely. No E2E code changed between runs; Prizgram deploy remains `d1948a1` (PR #304).
+- Previous correlation for `interview-questions` at `2026-08-27 23:38:36/56/39 UTC` (`a31ee9b09c9ce3de-NRT`) proved origin logged `UPSTREAM_INVALID_RESPONSE` caused by `LlmClientError SCHEMA_VALIDATION_FAILED: The normalized content did not match its domain schema`. The followup correlation is now also complete: all retries at `00:03:21/28/33/41/48 UTC` and `00:08:40/48/56 UTC` logged the same origin error for `interview-followup`.
 - `pnpm typecheck` passed before both runs; `pnpm install` used frozen lockfile.
 
 Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2a0b-story-as-one-evidence-video/error-context.md` and `trace.zip`.
@@ -41,19 +41,20 @@ Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2
 
 - E2E-origin: **No.** Locators/typecheck stable; 2 consecutive identical failures confirm product-side deterministic schema bug, not E2E flakiness. Retry correctly limited to HTML 502; JSON schema failures still fail-fast.
 - Prizgram-body-origin: **Yes, confirmed extended.** Interview AI followup provider schema `z.array(z.string())` unconstrained vs domain `array min1 max10 each trimmed min1 max500`. Same pattern as #300 scoring (`evidenceRefs`) and #305 expected-questions (`materialRefs`). All interview AI outputs (`expectedQuestions`, `answerOutline`, `followup`) need provider→domain constraint/normalization + trimming/filtering for empty/whitespace. Do not fix in E2E.
-- Infra-origin: **No for this reproduction.** No evidence of web/tunnel restart or OOM for prior window; 2 consecutive masking 502s at different timestamps with same behavior confirm application root cause. If future correlation shows no matching origin `SCHEMA_VALIDATION_FAILED`, then re-open #301 for infra.
+- Infra-origin: **No for this reproduction.** Web/tunnel `NRestarts=0` since `2026-08-27 19:38:47 UTC`, cgroup `oom=0`, `oom_kill=0`, and every correlated retry logged the application schema error. Re-open #301 only if a future HTML 502 has no matching origin application error.
 
 ## Changes and commits in this phase
 
 - No E2E source change (product bug, not masked).
-- Added two correlation comments to Prizgram **#305**:
+- Added three correlation comments to Prizgram **#305**:
   - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5446678155 – first followup failure `a31f0df15a8fd5ce-NRT` at `2026-08-28 00:03:48 UTC`, extends scope beyond expected-questions.
   - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5446709388 – second consecutive reproduction `a31f15745cf2ae80-NRT` at `2026-08-28 00:08:56 UTC`, confirms deterministic.
-- This HANDOFF update documents the second confirmation and must be committed/pushed; pushed to `origin/main`.
+  - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5447128601 – confirms origin-log correlation for both followup retry sequences and rules out restart/OOM.
+- This HANDOFF update documents the completed correlation and must be committed/pushed before another run.
 
 ## Prizgram issue
 
-- **#305** -- now confirmed for interview followup `SCHEMA_VALIDATION_FAILED` (2 reproductions). Original issue plus both comments: https://github.com/kuraryu405/Prizgram/issues/305 and #5446678155 / #5446709388
+- **#305** -- now confirmed for interview followup `SCHEMA_VALIDATION_FAILED` with complete origin correlation: https://github.com/kuraryu405/Prizgram/issues/305
 - **#301** -- retains infra fallback only if future correlation shows no matching application error: https://github.com/kuraryu405/Prizgram/issues/301
 - #300 / PR #304 remain closed; they fixed scoring but not interview AI.
 
@@ -63,7 +64,6 @@ Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2
 2. Do not raise E2E retry limit to hide schema failures; retry stays at 3 and only for Cloudflare HTML 502 on safe generation.
 3. Once #305 fix is deployed (check `gh api repos/kuraryu405/Prizgram/commits --jq '.[0].sha'` > `d1948a1`), rerun complete 14-step Golden Journey; do first-failure triage only at new failure. Deploy must be verified via `gh api` before rerun.
 4. Remove the temporary `.github/workflows/production-golden-once.yml` only after a fully passing 14-step run is recorded.
-5. Pending origin-log correlations for both followup windows `a31f0df15a8fd5ce-NRT` and `a31f15745cf2ae80-NRT`: verify `prizgram-web.service` logged `UPSTREAM_INVALID_RESPONSE / SCHEMA_VALIDATION_FAILED` for `interview-followup` at both timestamps ±30s. If not, update #301.
 
 ## Next command
 
