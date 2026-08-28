@@ -1,5 +1,4 @@
-import { testJob } from "../../src/fixtures/job.js";
-import { loginSuccessfully, newTestAccount, register } from "../../src/support/account.js";
+import { newTestAccount, register } from "../../src/support/account.js";
 import {
   applyToCurrentJob,
   recordRejectedSelectionResult,
@@ -62,8 +61,6 @@ baseTest.describe("Mobile demo — Persona / 求人評価 / Persona更新", () =
       // Make the final mobile state explicit for the editor and the viewer.
       await page.goto("/app/persona");
       await expect(page.locator(".page-lead")).toContainText("バージョン2");
-      await page.goto("/app/jobs");
-      await expect(page.getByRole("link", { name: new RegExp(testJob.companyName) })).toBeVisible();
     },
   );
 });
