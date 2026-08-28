@@ -1,57 +1,56 @@
 # HANDOFF
 
-Updated: 2026-08-28 10:59 JST
+Updated: 2026-08-28 11:05 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `e36c15aaa5368516bfd61a22215217f814679082` (`fix(persona-update): unwrap reevaluation API result`).
+- E2E code HEAD before this HANDOFF commit: `c9b7ef42f07af3560324cc9cfbb5257821e844cb` (`fix(account): assert logout login redirect`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
-- Deployment was verified: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
+- Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
 ## Golden Journey current step
 
-- Steps **01--11 passed** in the latest continuous production run. Their evidence PNGs and an MP4 exist under `artifacts/test-results/acceptance-golden-journey--d2a0b-story-as-one-evidence-video/`.
-- Step **12: 明示承認でPersona v2を作り求人を再評価** reached a visible successful re-evaluation (`再評価済み`, `全ての求人の再評価が完了しました。`) but the E2E helper then crashed.
-- The next run must restart at Step 01 to preserve one continuous final evidence video.
+- Steps **01--13 passed** in the latest continuous production run; their screenshots prove the UI through final dashboard and Persona v2 rendering.
+- First failing step: **14 ログアウト再ログイン後も状態が永続化**.
+- The failure occurred immediately after logout, before the actual re-login/persistence checks. Next run starts at Step 01 for one continuous evidence video.
 
 ## Latest error summary
 
-The latest `pnpm test:golden` ran about 3.9 minutes against deployed `c3ece3c` and failed after the first `/api/persona/update/re-evaluate` success:
+The latest production Golden ran about four minutes against deployed `c3ece3c` and failed with:
 
 ```text
-TypeError: Cannot read properties of undefined (reading 'filter')
-at requireSuccessfulReevaluation (src/support/persona-update.ts:31)
+Expected URL: /\/$/
+Received: https://prizgram.kuraryu.jp/login?next=%2Fapp
 ```
 
-Cause: the route returns `apiResult({ audit, remainingJobs })`, i.e. `{ ok, data: { audit, remainingJobs }, requestId }`, but E2E read `audit` as a top-level field. This was not a product/UI failure; the page snapshot proves the UI showed a successful re-evaluation.
+This is the intended app-shell logout behavior: the protected `/app` route redirects an unauthenticated user to `/login?next=%2Fapp`. The app's own `app-shell.test.tsx` asserts the same destination. The final dashboard screenshot and previous Step 13 evidence show no UI regression before this assertion.
 
 ## Classification
 
-- E2E-origin: **Yes.** API result envelope was decoded incorrectly.
-- Prizgram-body-origin: **No for this failure.** #305 interview structured-output fix is deployed and Step 08 passed.
-- Infra-origin: **No.** Production services/health stayed healthy.
+- E2E-origin: **Yes.** `src/support/account.ts` expected the wrong logout URL.
+- Prizgram-body-origin: **No.** The observed URL is the application contract.
+- Infra-origin: **No.** No service/health error occurred.
 
 ## Fix committed in this phase
 
-- `src/support/persona-update.ts`
-  - Unwraps `apiResult.data` before checking `audit` and `remainingJobs`.
-  - Validates the envelope at runtime, producing a descriptive E2E error instead of a TypeError if the contract changes again.
-- Commit `e36c15aaa5368516bfd61a22215217f814679082` — `fix(persona-update): unwrap reevaluation API result`; pushed to `origin/main`.
-- `pnpm typecheck` passed. The E2E package does not include Prettier; the attempted format command therefore reported `Command "prettier" not found` before no formatting was applied.
+- `src/support/account.ts`
+  - Expects `/login?next=%2Fapp` after logout and confirms the login heading is visible.
+- Commit `c9b7ef42f07af3560324cc9cfbb5257821e844cb` — `fix(account): assert logout login redirect`; pushed to `origin/main`.
+- `pnpm typecheck` passed. The E2E package does not include Prettier; its attempted format command previously reported `Command "prettier" not found` without changing files.
 
 ## Prizgram issues
 
 - #305 — interview AI structured-output error; fixed by deployed PR #306.
 - #307 — safe deployment backup without `sqlite3` CLI; fixed by deployed PR #308.
-- #301 — only for a future Cloudflare HTML 502 without a matching origin application error.
+- #301 — only for a future Cloudflare HTML 502 without matching origin application error.
 
 ## Unresolved items
 
-1. Run production Golden from Step 01 on E2E HEAD `e36c15a`.
-2. Inspect the final MP4/screenshots if all 14 steps pass; this is the UI regression evidence.
-3. If a new failure occurs, diagnose only that first failure, then make the smallest E2E or Prizgram change, typecheck, commit/push, update HANDOFF, and rerun.
-4. Remove `.github/workflows/production-golden-once.yml` only after full Golden success.
+1. Rerun the full production Golden on E2E HEAD `c9b7ef4`.
+2. If all 14 steps pass, inspect the final continuous MP4/screenshots for UI regression and record final status/SHA in this HANDOFF.
+3. Remove `.github/workflows/production-golden-once.yml` only after full success.
+4. If a new failure occurs, diagnose only it, make the smallest correct E2E/Prizgram fix, typecheck, commit/push, update HANDOFF, then rerun.
 
 ## Next command
 
@@ -67,10 +66,10 @@ pnpm test:golden
 
 ## If the next run fails, inspect these first
 
-- Step 12: `src/support/persona-update.ts`, API envelope from `apps/web/src/app/api/persona/update/re-evaluate/route.ts`.
-- Step 13: `src/support/dashboard.ts`.
-- Step 14: `tests/acceptance/golden-journey.spec.ts` and account/session helpers.
+- Step 14: `src/support/account.ts`, `src/support/auth` helpers, `apps/web/src/components/app/app-shell.tsx`, then session persistence.
 - Cloudflare HTML 502: #301 plus timestamp-correlated `prizgram-web.service` / `cloudflared-prizgram.service` logs.
+- Step 08: deployed #306 / `apps/web/src/server/interview-ai/schemas.ts` and service.
+- Step 10--13: corresponding E2E support helpers and visible evidence screenshot.
 
 ## Required cycle
 
