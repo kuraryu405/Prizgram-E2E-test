@@ -63,7 +63,8 @@ export async function logout(page: Page): Promise<void> {
   const accountTrigger = page.getByLabel(/^アカウント /);
   await accountTrigger.click();
   await page.getByRole("button", { name: "ログアウト" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/login\?next=%2Fapp$/);
+  await expect(page.getByRole("heading", { name: "ログイン" })).toBeVisible();
 }
 
 export async function changePassword(
