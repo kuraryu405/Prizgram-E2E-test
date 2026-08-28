@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 16:47 JST
+Updated: 2026-08-28 16:49 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `a1452ae` (`fix(e2e): end mobile demo on updated persona`).
+- E2E code HEAD before this HANDOFF commit: `78b37fe6a0042a41ab7673225b20f2b5a3cab753` (`docs: record mobile demo final-screen fix`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -36,9 +36,11 @@ The first mobile demo run passed functionally, but visual QA found the first rec
 - E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
-- Mobile demo phase: **First run passed functionally and the recording frame was fixed; final-screen sequencing fix pending rerun.**
+- Mobile demo phase: **Complete: scenes 01--03 passed in one continuous production run.**
 - The gray-padding issue is **E2E-origin** (`tests/acceptance/mobile-demo.spec.ts` / `scripts/run-playwright.mjs`), not a Prizgram UI or infrastructure failure.
 - The first corrected video ended on the求人検索 screen because the test performed a redundant final verification navigation; this is also **E2E-origin** and does not indicate a Prizgram UI failure.
+- Final rerun passed with no `error-context.md`; the final frame shows Persona バージョン2.
+- Evidence: `artifacts/test-results/acceptance-mobile-demo-Mob-007cb-nes-as-one-continuous-story/video.mp4` — H.264, 1080x2340, 25 fps, 95.84 s.
 
 ## Mobile demo current step
 
@@ -79,9 +81,7 @@ The first mobile demo run passed functionally, but visual QA found the first rec
 
 ## Unresolved items
 
-1. Rerun the mobile demo against production with mutation guards enabled after the final-screen fix.
-2. Verify MP4 dimensions, duration, final Persona v2 screen, and no mobile UI overflow.
-3. If it fails, diagnose only the first failure and update this HANDOFF before continuing.
+- None for the requested E2E mobile demo. Golden Journey and mobile demo are both complete; the workspace is clean.
 
 ## Next command
 
