@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 11:18 JST
+Updated: 2026-08-28 16:39 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `ffd04f4bc115a7a1c6f8ab2a6642541d6f984c9b` (`chore: remove one-shot production Golden workflow`).
+- E2E code HEAD before this HANDOFF commit: `2a87943a8fde8a3243a3d6a2a0c37338418a4348` (`feat(e2e): add high-resolution mobile demo flow`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -34,6 +34,13 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 - E2E-origin: **Yes; resolved.** `tests/acceptance/golden-journey.spec.ts` expected a nonexistent rejected-filter link instead of the visible rejected card state.
 - Prizgram-body-origin: **No.** The observed URL is the application contract.
 - Infra-origin: **No.** No service/health error occurred.
+- Mobile demo phase: **Not run yet.** There is no new failure to classify.
+
+## Mobile demo current step
+
+- Dedicated mobile demo scenario is implemented but not yet run against production.
+- Target recording: 390x844 CSS px, DPR 3, portrait 1080x2340 MP4.
+- Scenes: Persona generation, job import plus three-axis evaluation, and rejected result → Persona update plus re-evaluation.
 
 ## Fix committed in this phase
 
@@ -44,6 +51,14 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 - `.github/workflows/production-golden-once.yml`
   - Removed after the fully passing production run; it was a temporary one-shot workflow.
 - Commit `ffd04f4bc115a7a1c6f8ab2a6642541d6f984c9b` — `chore: remove one-shot production Golden workflow`; pushed to `origin/main`.
+- `tests/acceptance/mobile-demo.spec.ts`
+  - Adds the continuous mobile demo story using synthetic E2E fixtures.
+- `package.json`
+  - Adds `pnpm test:mobile-demo`.
+- `scripts/run-playwright.mjs`
+  - Enables human-readable pacing for the mobile demo.
+- Commit `2a87943a8fde8a3243a3d6a2a0c37338418a4348` — `feat(e2e): add high-resolution mobile demo flow`; pushed to `origin/main`.
+- `pnpm typecheck` and `git diff --check` passed.
 
 ## Prizgram issues
 
@@ -53,7 +68,9 @@ The application list only exposes workflow filters through `offer`; `rejected` i
 
 ## Unresolved items
 
-- None. Golden Journey is complete and the workspace must remain clean.
+1. Run the new mobile demo against production with mutation guards enabled.
+2. Verify MP4 dimensions, duration, final Persona v2 screen, and no mobile UI overflow.
+3. If it fails, diagnose only the first failure and update this HANDOFF before continuing.
 
 ## Next command
 
@@ -63,7 +80,7 @@ pnpm typecheck
 E2E_BASE_URL=https://prizgram.kuraryu.jp \
 E2E_ALLOW_MUTATION=true \
 E2E_ALLOW_PRODUCTION=true \
-pnpm test:golden
+pnpm test:mobile-demo
 ```
 
 ## If the next run fails, inspect these first
@@ -72,6 +89,8 @@ pnpm test:golden
 - Cloudflare HTML 502: #301 plus timestamp-correlated `prizgram-web.service` / `cloudflared-prizgram.service` logs.
 - Step 08: deployed #306 / `apps/web/src/server/interview-ai/schemas.ts` and service.
 - Step 10--13: corresponding E2E support helpers and visible evidence screenshot.
+- Mobile demo: `tests/acceptance/mobile-demo.spec.ts`, `src/support/persona.ts`, `src/support/jobs.ts`, `src/support/applications.ts`, `src/support/persona-update.ts`.
+- Video quality: `playwright.config.ts`, `scripts/run-playwright.mjs`, then generated MP4 `ffprobe` metadata.
 
 ## Required cycle
 
