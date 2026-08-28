@@ -1,78 +1,57 @@
 # HANDOFF
 
-Updated: 2026-08-28 10:55 JST
+Updated: 2026-08-28 10:59 JST
 
 ## Repository state
 
-- Repository: `kuraryu405/Prizgram-E2E-test`
-- E2E branch: `main`
-- E2E code HEAD before this HANDOFF commit: `1fd96b05ee43be54cc7d38778b3e09a9545a4e7e` (`docs: record safe deploy abort and recovery`)
+- Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
+- E2E code HEAD before this HANDOFF commit: `e36c15aaa5368516bfd61a22215217f814679082` (`fix(persona-update): unwrap reevaluation API result`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
-- Deployment verification: the release script created and `integrity_check`-verified a SQLite snapshot, applied migrations, switched `current`, and passed its health check. Follow-up read-only checks confirmed loopback and public `/api/health` 200, plus active web/tunnel services with `NRestarts=0`.
-- Target: `https://prizgram.kuraryu.jp` with explicit production and mutation opt-ins.
+- Deployment was verified: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
 ## Golden Journey current step
 
-- Steps **01 through 07 passed** again in two consecutive local production runs (evidence PNGs 01-07 and MP4 generated, durations 2m35s and 3m18s).
-- Within Step **08 面接想定質問から回答骨子と深掘りを生成**, the first two AI calls **consistently succeed** now: `POST /api/applications/:id/interview-questions` (想定質問) and `POST /api/applications/:id/interview-outline` (回答骨子).
-- First failing sub-operation **remains 08c interview-followup** (`POST /api/applications/:id/interview-followup` → `Interview follow-up generation` in `src/support/interview.ts:75`).
-- Second confirmation run at `2026-08-28 00:08:56 UTC` (cf-ray `a31f15745cf2ae80-NRT`) reproduces identical failure after 3 Cloudflare 502 retries, confirming deterministic provider→domain mismatch for followup, not a one-off LLM nondeterminism.
-- A final evidence MP4 and Step 01-07 screenshots are at `artifacts/test-results/acceptance-golden-journey--d2a0b-story-as-one-evidence-video/` locally (latest run 3m18s, 800x450). The next execution intentionally starts again at Step 01 to preserve one continuous Golden Journey recording.
+- Steps **01--11 passed** in the latest continuous production run. Their evidence PNGs and an MP4 exist under `artifacts/test-results/acceptance-golden-journey--d2a0b-story-as-one-evidence-video/`.
+- Step **12: 明示承認でPersona v2を作り求人を再評価** reached a visible successful re-evaluation (`再評価済み`, `全ての求人の再評価が完了しました。`) but the E2E helper then crashed.
+- The next run must restart at Step 01 to preserve one continuous final evidence video.
 
 ## Latest error summary
 
-Two consecutive local runs of:
+The latest `pnpm test:golden` ran about 3.9 minutes against deployed `c3ece3c` and failed after the first `/api/persona/update/re-evaluate` success:
 
-```bash
-E2E_BASE_URL=https://prizgram.kuraryu.jp E2E_ALLOW_MUTATION=true E2E_ALLOW_PRODUCTION=true pnpm test:golden
+```text
+TypeError: Cannot read properties of undefined (reading 'filter')
+at requireSuccessfulReevaluation (src/support/persona-update.ts:31)
 ```
 
-both failed at Step 08c after ~2m36s and ~3m18s:
-
-- Run 1 (2026-08-28 00:03:48 UTC, `a31f0df15a8fd5ce-NRT`): `Interview follow-up generation failed after 3 attempts because Cloudflare repeatedly returned an HTML 502 Bad Gateway.` diagnostics `content-type=text/html; charset=UTF-8, server=cloudflare, cf-ray=a31f0df15a8fd5ce-NRT`
-- Run 2 (2026-08-28 00:08:56 UTC, `a31f15745cf2ae80-NRT`): same message, diagnostics `content-type=text/html; charset=UTF-8, server=cloudflare, cf-ray=a31f15745cf2ae80-NRT`
-- HTTP: `502 Bad gateway`; title: `kuraryu.jp | 502: Bad gateway`; prior successes: `interview-questions` + `interview-outline`.
-- Bounded retry applies only to side-effect-free AI generation; all 3 followup attempts per run returned Cloudflare HTML representation. Edge masks origin's 502 body, so E2E cannot see application JSON directly.
-- Previous correlation for `interview-questions` at `2026-08-27 23:38:36/56/39 UTC` (`a31ee9b09c9ce3de-NRT`) proved origin logged `UPSTREAM_INVALID_RESPONSE` caused by `LlmClientError SCHEMA_VALIDATION_FAILED: The normalized content did not match its domain schema`. The followup correlation is now also complete: all retries at `00:03:21/28/33/41/48 UTC` and `00:08:40/48/56 UTC` logged the same origin error for `interview-followup`.
-- `pnpm typecheck` passed before both runs; `pnpm install` used frozen lockfile.
-
-Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2a0b-story-as-one-evidence-video/error-context.md` and `trace.zip`.
+Cause: the route returns `apiResult({ audit, remainingJobs })`, i.e. `{ ok, data: { audit, remainingJobs }, requestId }`, but E2E read `audit` as a top-level field. This was not a product/UI failure; the page snapshot proves the UI showed a successful re-evaluation.
 
 ## Classification
 
-- E2E-origin: **No.** Locators/typecheck stable; 2 consecutive identical failures confirm product-side deterministic schema bug, not E2E flakiness. Retry correctly limited to HTML 502; JSON schema failures still fail-fast.
-- Prizgram-body-origin: **Yes, confirmed extended.** Interview AI followup provider schema `z.array(z.string())` unconstrained vs domain `array min1 max10 each trimmed min1 max500`. Same pattern as #300 scoring (`evidenceRefs`) and #305 expected-questions (`materialRefs`). All interview AI outputs (`expectedQuestions`, `answerOutline`, `followup`) need provider→domain constraint/normalization + trimming/filtering for empty/whitespace. Do not fix in E2E.
-- Infra-origin: **No for this reproduction.** Web/tunnel `NRestarts=0` since `2026-08-27 19:38:47 UTC`, cgroup `oom=0`, `oom_kill=0`, and every correlated retry logged the application schema error. Re-open #301 only if a future HTML 502 has no matching origin application error.
+- E2E-origin: **Yes.** API result envelope was decoded incorrectly.
+- Prizgram-body-origin: **No for this failure.** #305 interview structured-output fix is deployed and Step 08 passed.
+- Infra-origin: **No.** Production services/health stayed healthy.
 
-## Changes and commits in this phase
+## Fix committed in this phase
 
-- No E2E source change (product bug, not masked).
-- Prizgram #306 merged `0c292c7bff55c17adfcc29d381cef6109b119ea3`; the schema fix passed typecheck, 542 tests, lint, and production build before merge.
-- A manual deploy was attempted once using the canonical `remote-release.sh` and stopped safely during the pre-deploy backup:
-  - `sqlite3: command not found`
-  - `Backup failed; aborting deploy before migration`
-  - `Restarting previous service after backup failure...`
-- Safety verification immediately after abort: `current` stayed `d1948a1`; web service was `active/running`; loopback `/api/health` returned 200; no migration or symlink switch occurred.
-- Prizgram #308 subsequently merged `c3ece3c7419404f1622f8faa69a016fc05141143`; it replaces the unavailable `sqlite3` CLI with a verified `better-sqlite3` snapshot helper while retaining the abort/restart guard. The second canonical deploy completed successfully.
-- Added three correlation comments to Prizgram **#305**:
-  - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5446678155 – first followup failure `a31f0df15a8fd5ce-NRT` at `2026-08-28 00:03:48 UTC`, extends scope beyond expected-questions.
-  - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5446709388 – second consecutive reproduction `a31f15745cf2ae80-NRT` at `2026-08-28 00:08:56 UTC`, confirms deterministic.
-  - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5447128601 – confirms origin-log correlation for both followup retry sequences and rules out restart/OOM.
-- This HANDOFF update documents the completed correlation and must be committed/pushed before another run.
+- `src/support/persona-update.ts`
+  - Unwraps `apiResult.data` before checking `audit` and `remainingJobs`.
+  - Validates the envelope at runtime, producing a descriptive E2E error instead of a TypeError if the contract changes again.
+- Commit `e36c15aaa5368516bfd61a22215217f814679082` — `fix(persona-update): unwrap reevaluation API result`; pushed to `origin/main`.
+- `pnpm typecheck` passed. The E2E package does not include Prettier; the attempted format command therefore reported `Command "prettier" not found` before no formatting was applied.
 
-## Prizgram issue
+## Prizgram issues
 
-- **#305** -- fixed by merged/deployed PR #306: https://github.com/kuraryu405/Prizgram/issues/305
-- **#307** -- resolved by merged/deployed PR #308; canonical backup succeeded: https://github.com/kuraryu405/Prizgram/issues/307
-- **#301** -- retains infra fallback only if future correlation shows no matching application error: https://github.com/kuraryu405/Prizgram/issues/301
-- #300 / PR #304 remain closed; they fixed scoring but not interview AI.
+- #305 — interview AI structured-output error; fixed by deployed PR #306.
+- #307 — safe deployment backup without `sqlite3` CLI; fixed by deployed PR #308.
+- #301 — only for a future Cloudflare HTML 502 without a matching origin application error.
 
 ## Unresolved items
 
-1. Run the complete 14-step production Golden Journey now against deployed `c3ece3c` and inspect the final continuous evidence MP4 for UI regression.
-2. Do not raise E2E retry limit to hide product failures; retry remains limited to three Cloudflare HTML 502s for side-effect-free generation.
-3. If a new first failure occurs, classify it and follow the required cycle. Do not re-open #305/#307 unless evidence contradicts the deployed fixes.
-4. Remove the temporary `.github/workflows/production-golden-once.yml` only after a fully passing 14-step run is recorded.
+1. Run production Golden from Step 01 on E2E HEAD `e36c15a`.
+2. Inspect the final MP4/screenshots if all 14 steps pass; this is the UI regression evidence.
+3. If a new failure occurs, diagnose only that first failure, then make the smallest E2E or Prizgram change, typecheck, commit/push, update HANDOFF, and rerun.
+4. Remove `.github/workflows/production-golden-once.yml` only after full Golden success.
 
 ## Next command
 
@@ -88,15 +67,13 @@ pnpm test:golden
 
 ## If the next run fails, inspect these first
 
-- Step 08: Prizgram #305 / deployed #306; `apps/web/src/server/interview-ai/schemas.ts`, `apps/web/src/server/interview-ai/service.ts`, and `apps/web/src/server/llm/client.ts`. Use `src/support/interview.ts` and `src/support/api-waits.ts` only to classify response; do not hide.
-- Cloudflare HTML 502 without matching application error at correlated timestamp: #301, then production `prizgram-web.service` and `cloudflared-prizgram.service` logs around error timestamp (check `NRestarts`, `oom_kill`, `journalctl -u prizgram-web.service --since "..."`).
-- Step 10: `src/support/applications.ts`.
-- Step 11--12: `src/support/persona-update.ts` (propose/reevaluate also uses LLM, same schema class).
+- Step 12: `src/support/persona-update.ts`, API envelope from `apps/web/src/app/api/persona/update/re-evaluate/route.ts`.
 - Step 13: `src/support/dashboard.ts`.
 - Step 14: `tests/acceptance/golden-journey.spec.ts` and account/session helpers.
+- Cloudflare HTML 502: #301 plus timestamp-correlated `prizgram-web.service` / `cloudflared-prizgram.service` logs.
 
 ## Required cycle
 
 `run -> diagnose first failure -> smallest safe fix -> typecheck -> commit/push -> update HANDOFF.md -> rerun`
 
-Keep no uncommitted E2E files. Do not modify Prizgram body code from this E2E loop; record product or infra defects in the appropriate Prizgram issue instead.
+Keep no uncommitted E2E files. Do not hide real product failures with E2E retries.
