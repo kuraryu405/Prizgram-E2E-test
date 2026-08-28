@@ -1,11 +1,11 @@
 # HANDOFF
 
-Updated: 2026-08-28 16:49 JST
+Updated: 2026-08-28 16:50 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`, branch `main`.
-- E2E code HEAD before this HANDOFF commit: `78b37fe6a0042a41ab7673225b20f2b5a3cab753` (`docs: record mobile demo final-screen fix`).
+- E2E code HEAD before this HANDOFF commit: `6dcf3c95dc0761b613c6945d8e77e8fb8741b8c0` (`docs: complete mobile demo handoff`).
 - Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
 - Deployed release verification: SQLite backup + `integrity_check`, migration, release switch, loopback/public health 200, active web/tunnel services, `NRestarts=0`.
 
@@ -44,7 +44,7 @@ The first mobile demo run passed functionally, but visual QA found the first rec
 
 ## Mobile demo current step
 
-- Dedicated mobile demo scenario is implemented but not yet run against production.
+- Dedicated mobile demo scenario is implemented and complete against production.
 - Target recording: 390x844 CSS px, DPR 3, portrait 1080x2340 MP4.
 - Scenes: Persona generation, job import plus three-axis evaluation, and rejected result → Persona update plus re-evaluation.
 
