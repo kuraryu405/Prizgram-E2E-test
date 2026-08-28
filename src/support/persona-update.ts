@@ -22,12 +22,29 @@ type ReevaluationPayload = Readonly<{
   remainingJobs: number;
 }>;
 
+type ApiResult<T> = Readonly<{
+  ok: boolean;
+  data?: T;
+  requestId?: string;
+}>;
+
 function personaHistory(page: Page) {
   return page.getByRole("heading", { name: "バージョン履歴" }).locator("..");
 }
 
 async function requireSuccessfulReevaluation(response: Response): Promise<number> {
-  const payload = (await response.json()) as ReevaluationPayload;
+  const result = (await response.json()) as ApiResult<ReevaluationPayload>;
+  const payload = result.data;
+  if (
+    result.ok !== true ||
+    payload === undefined ||
+    !Array.isArray(payload.audit) ||
+    typeof payload.remainingJobs !== "number"
+  ) {
+    throw new Error(
+      `Persona job re-evaluation returned an unexpected API result: ${JSON.stringify(result)}`,
+    );
+  }
   const failures = payload.audit.filter(
     (entry): entry is Extract<ReevaluationPayload["audit"][number], { status: "failed" }> =>
       entry.status === "failed",
