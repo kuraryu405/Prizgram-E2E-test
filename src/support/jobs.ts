@@ -5,6 +5,7 @@ import {
   runAndRequireAiResponse,
   runAndRequireResponse,
 } from "./api-waits.js";
+import { withDemoWait } from "./demo-timeline.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
@@ -93,7 +94,10 @@ export async function evaluateCurrentJob(page: Page): Promise<void> {
 
   let scoreResponse: Response | undefined;
   for (let attempt = 1; attempt <= CLOUDFLARE_SCORE_RETRY_LIMIT; attempt += 1) {
-    scoreResponse = await requestCurrentJobScore(page);
+    scoreResponse = await withDemoWait(
+      `Job scoring (attempt ${attempt})`,
+      () => requestCurrentJobScore(page),
+    );
     if (scoreResponse.ok()) break;
 
     const body = await scoreResponse.text().catch(() => "<response body unavailable>");

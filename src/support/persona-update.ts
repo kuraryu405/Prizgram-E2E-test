@@ -6,6 +6,7 @@ import {
   runAndRequireAiResponse,
   runAndRequireRetryableAiResponse,
 } from "./api-waits.js";
+import { withDemoWait } from "./demo-timeline.js";
 import { assertMutationAllowed } from "./env.js";
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
 
@@ -119,11 +120,11 @@ export async function approvePersonaUpdateAndFinishReevaluation(page: Page): Pro
     .click();
 
   await requireSuccessfulResponse(
-    await approveResponsePromise,
+    await withDemoWait("Persona update approval", () => approveResponsePromise),
     "Persona update approval",
   );
   const firstReevaluation = await requireSuccessfulResponse(
-    await reevaluateResponsePromise,
+    await withDemoWait("Persona job re-evaluation", () => reevaluateResponsePromise),
     "Persona job re-evaluation",
   );
   let remainingJobs = await requireSuccessfulReevaluation(firstReevaluation);

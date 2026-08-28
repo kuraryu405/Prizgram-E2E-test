@@ -1,6 +1,7 @@
 import type { Page, Response } from "@playwright/test";
 
 import { AI_RESULT_TIMEOUT } from "./timeouts.js";
+import { withDemoWait } from "./demo-timeline.js";
 
 const MAX_ERROR_BODY_CHARS = 2_000;
 const DEFAULT_API_TIMEOUT_MS = 20_000;
@@ -98,12 +99,14 @@ export async function runAndRequireAiResponse(
   operation: string,
   action: () => Promise<void>,
 ): Promise<Response> {
-  return runAndRequireResponse(
-    page,
-    matcher,
-    operation,
-    action,
-    AI_RESULT_TIMEOUT,
+  return withDemoWait(operation, () =>
+    runAndRequireResponse(
+      page,
+      matcher,
+      operation,
+      action,
+      AI_RESULT_TIMEOUT,
+    ),
   );
 }
 
@@ -126,14 +129,18 @@ export async function runAndRequireRetryableAiResponse(
     const responsePromise = page.waitForResponse(matcher, {
       timeout: AI_RESULT_TIMEOUT,
     });
-    try {
-      await action();
-    } catch (error) {
-      void responsePromise.catch(() => undefined);
-      throw error;
-    }
-
-    const response = await responsePromise;
+    const response = await withDemoWait(
+      `${operation} (attempt ${attempt})`,
+      async () => {
+        try {
+          await action();
+        } catch (error) {
+          void responsePromise.catch(() => undefined);
+          throw error;
+        }
+        return responsePromise;
+      },
+    );
     if (response.ok()) return response;
 
     const body = await responseBodyForError(response);
