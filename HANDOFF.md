@@ -1,14 +1,14 @@
 # HANDOFF
 
-Updated: 2026-08-28 10:48 JST
+Updated: 2026-08-28 10:55 JST
 
 ## Repository state
 
 - Repository: `kuraryu405/Prizgram-E2E-test`
 - E2E branch: `main`
-- E2E code HEAD before this HANDOFF commit: `ea3617a15a052e3db249d4f38d5e619f296d2d9a` (`docs: confirm Golden followup origin correlation`)
-- Prizgram Git main HEAD: `0c292c7bff55c17adfcc29d381cef6109b119ea3` (merged PR #306 / closes #305).
-- Deployed production release remains: `d1948a1083ed19d2b7c69cde9575d566f970ba85`.
+- E2E code HEAD before this HANDOFF commit: `1fd96b05ee43be54cc7d38778b3e09a9545a4e7e` (`docs: record safe deploy abort and recovery`)
+- Prizgram Git main and deployed production release: `c3ece3c7419404f1622f8faa69a016fc05141143`.
+- Deployment verification: the release script created and `integrity_check`-verified a SQLite snapshot, applied migrations, switched `current`, and passed its health check. Follow-up read-only checks confirmed loopback and public `/api/health` 200, plus active web/tunnel services with `NRestarts=0`.
 - Target: `https://prizgram.kuraryu.jp` with explicit production and mutation opt-ins.
 
 ## Golden Journey current step
@@ -53,6 +53,7 @@ Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2
   - `Backup failed; aborting deploy before migration`
   - `Restarting previous service after backup failure...`
 - Safety verification immediately after abort: `current` stayed `d1948a1`; web service was `active/running`; loopback `/api/health` returned 200; no migration or symlink switch occurred.
+- Prizgram #308 subsequently merged `c3ece3c7419404f1622f8faa69a016fc05141143`; it replaces the unavailable `sqlite3` CLI with a verified `better-sqlite3` snapshot helper while retaining the abort/restart guard. The second canonical deploy completed successfully.
 - Added three correlation comments to Prizgram **#305**:
   - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5446678155 – first followup failure `a31f0df15a8fd5ce-NRT` at `2026-08-28 00:03:48 UTC`, extends scope beyond expected-questions.
   - https://github.com/kuraryu405/Prizgram/issues/305#issuecomment-5446709388 – second consecutive reproduction `a31f15745cf2ae80-NRT` at `2026-08-28 00:08:56 UTC`, confirms deterministic.
@@ -61,16 +62,16 @@ Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2
 
 ## Prizgram issue
 
-- **#305** -- fixed by merged PR #306, but not yet deployed: https://github.com/kuraryu405/Prizgram/issues/305
-- **#307** -- manual deploy prerequisite failure (`sqlite3` CLI missing); do not bypass backup or retry production deploy before resolving it: https://github.com/kuraryu405/Prizgram/issues/307
+- **#305** -- fixed by merged/deployed PR #306: https://github.com/kuraryu405/Prizgram/issues/305
+- **#307** -- resolved by merged/deployed PR #308; canonical backup succeeded: https://github.com/kuraryu405/Prizgram/issues/307
 - **#301** -- retains infra fallback only if future correlation shows no matching application error: https://github.com/kuraryu405/Prizgram/issues/301
 - #300 / PR #304 remain closed; they fixed scoring but not interview AI.
 
 ## Unresolved items
 
-1. Resolve #307 safely: provision/verify the canonical backup prerequisite or change the deploy backup implementation through review. Do not bypass backup, manually switch `current`, run migrations, or retry the deployment until then.
-2. Do not raise E2E retry limit to hide schema failures; retry stays at 3 and only for Cloudflare HTML 502 on safe generation.
-3. After #307 is resolved, deploy merged main `0c292c7...`, verify `current` points to that release and `/api/health` is 200, then rerun complete 14-step Golden Journey.
+1. Run the complete 14-step production Golden Journey now against deployed `c3ece3c` and inspect the final continuous evidence MP4 for UI regression.
+2. Do not raise E2E retry limit to hide product failures; retry remains limited to three Cloudflare HTML 502s for side-effect-free generation.
+3. If a new first failure occurs, classify it and follow the required cycle. Do not re-open #305/#307 unless evidence contradicts the deployed fixes.
 4. Remove the temporary `.github/workflows/production-golden-once.yml` only after a fully passing 14-step run is recorded.
 
 ## Next command
@@ -78,8 +79,6 @@ Full Playwright output cf. `artifacts/test-results/acceptance-golden-journey--d2
 ```bash
 git pull --ff-only
 git rev-parse --short HEAD
-# wait for and resolve #307, then verify deployed release:
-ssh -i /Users/tsutsumin/.ssh/prizgram_deploy prizgram-deploy@prizgram.tail0d4c05.ts.net 'readlink -f "$HOME/prizgram/current"; curl --fail http://127.0.0.1:3000/api/health'
 pnpm typecheck
 E2E_BASE_URL=https://prizgram.kuraryu.jp \
 E2E_ALLOW_MUTATION=true \
@@ -89,8 +88,7 @@ pnpm test:golden
 
 ## If the next run fails, inspect these first
 
-- Deploy failure: #307 and `scripts/deploy/remote-release.sh` backup prerequisites. Confirm backup succeeds before any migration/release switch.
-- Step 08 after deploy: Prizgram #305 / merged #306; `apps/web/src/server/interview-ai/schemas.ts`, `apps/web/src/server/interview-ai/service.ts`, and `apps/web/src/server/llm/client.ts`. Use `src/support/interview.ts` and `src/support/api-waits.ts` only to classify response; do not hide.
+- Step 08: Prizgram #305 / deployed #306; `apps/web/src/server/interview-ai/schemas.ts`, `apps/web/src/server/interview-ai/service.ts`, and `apps/web/src/server/llm/client.ts`. Use `src/support/interview.ts` and `src/support/api-waits.ts` only to classify response; do not hide.
 - Cloudflare HTML 502 without matching application error at correlated timestamp: #301, then production `prizgram-web.service` and `cloudflared-prizgram.service` logs around error timestamp (check `NRestarts`, `oom_kill`, `journalctl -u prizgram-web.service --since "..."`).
 - Step 10: `src/support/applications.ts`.
 - Step 11--12: `src/support/persona-update.ts` (propose/reevaluate also uses LLM, same schema class).
